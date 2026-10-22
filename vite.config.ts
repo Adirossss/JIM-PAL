@@ -4,6 +4,9 @@ import { defineConfig } from 'vitest/config';
 // dependencies to the allowed list). The trade-off: no React Fast Refresh, so
 // edits trigger a full page reload during development.
 export default defineConfig({
+  // Relative asset paths, so the build works at any sub-path such as
+  // https://<user>.github.io/jim-pal/ (GitHub Pages).
+  base: './',
   esbuild: {
     jsx: 'automatic',
   },
