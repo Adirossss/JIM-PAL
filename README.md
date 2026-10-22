@@ -1,1 +1,92 @@
-# JIM-PAL
+# Jim-Pal — personal gym workout tracker
+
+A mobile-first workout log with a Hebrew, right-to-left UI. Everything runs in the
+browser: no backend, no accounts, no external APIs. Data is stored in the
+browser's `localStorage`.
+
+## Features
+
+- **Exercise library** — 149 built-in exercises (machines, free weights, cables,
+  bodyweight) across chest, back, shoulders, biceps, triceps, forearms, quads,
+  hamstrings, glutes, calves and core. Search in Hebrew or English, filter by
+  muscle group and equipment, and add your own custom exercises.
+- **Workout logging** — start a workout (date defaults to today), add exercises,
+  log sets (weight in kg with decimals, reps), edit or delete sets. A new set is
+  pre-filled from the last logged set of that exercise, and "duplicate last set"
+  adds an identical set in one tap. For bodyweight exercises the weight is the
+  optional *added* load (e.g. a dip belt). Notes per exercise and per workout.
+  An unfinished workout survives a page reload.
+- **History & progress** — past workouts grouped by month, newest first. For each
+  exercise: every past session, the best set, total volume (Σ weight × reps), the
+  estimated 1RM (Epley: `weight × (1 + reps / 30)`), and an SVG chart of the best
+  estimated 1RM over time.
+- **Backup** — export all data to a JSON file and import it back. Imports are
+  fully validated; a malformed file is rejected without touching existing data.
+
+## Requirements
+
+- [Node.js](https://nodejs.org/) **22.12 or newer** (the current LTS is fine) and npm.
+
+## Install and run
+
+```bash
+npm install        # install dependencies
+npm run dev        # start the dev server, then open http://localhost:5173
+```
+
+To open the app from a phone on the same Wi-Fi network:
+
+```bash
+npm run dev -- --host
+```
+
+Vite prints a `Network:` address (e.g. `http://192.168.1.20:5173`) — open it on the
+phone. Note that data is stored per browser and per address, so the phone keeps
+its own separate data.
+
+### Other scripts
+
+```bash
+npm test           # run the unit tests once (Vitest)
+npm run test:watch # run the tests in watch mode
+npm run build      # type-check and build for production into dist/
+npm run preview    # serve the production build locally
+```
+
+## How data is stored
+
+- All data lives under a single `localStorage` key, `jim-pal:data`, as one JSON
+  document with a `schemaVersion` field (currently `1`).
+- `src/lib/storage.ts` is the only module that touches `localStorage`.
+- If stored data can't be read, it is copied to a backup key
+  (`jim-pal:data:unreadable:<timestamp>`) instead of being overwritten, and the app
+  starts empty with a warning.
+- Data is tied to one browser on one device. Clearing site data deletes it — use
+  **גיבוי → ייצוא** (Backup → Export) regularly.
+
+## Project structure
+
+```
+src/
+  types.ts             domain types and Hebrew labels
+  data/exercises.ts    seed exercise library
+  lib/                 pure, UI-free logic (each file has a *.test.ts next to it)
+    exercises.ts       search, filters, custom exercises
+    stats.ts           volume, Epley 1RM, best set, history, grouping, progress series
+    workout.ts         workout/set operations, pre-fill, input validation
+    schema.ts          schema version, migrations, import validation, export
+    storage.ts         the localStorage data-access module
+    format.ts          dates and number parsing/formatting
+    chart.ts           axis math for the SVG chart
+    route.ts           hash-based routes
+    ids.ts             ID generation
+  state/AppContext.tsx app state, persistence and navigation
+  components/          React screens and components
+```
+
+## Dependencies
+
+Runtime: `react`, `react-dom`. Development: `vite`, `typescript`, `vitest`,
+`@types/react`, `@types/react-dom`. JSX is compiled by Vite's built-in esbuild,
+without `@vitejs/plugin-react`, so editing a file during `npm run dev` reloads
+the page instead of hot-swapping components.
