@@ -20,8 +20,9 @@ import {
 } from '../lib/stats';
 import { addExercise, finishWorkout, setWorkoutDate, setWorkoutNote, startWorkout } from '../lib/workout';
 import { useApp } from '../state/AppContext';
+import { useConfirm } from '../state/confirm';
 import { MUSCLE_LABELS_HE, type Workout } from '../types';
-import { EmptyState, Icon, ScreenHeader } from './common';
+import { DateField, EmptyState, Icon, ScreenHeader } from './common';
 import { ExerciseEntryCard } from './ExerciseEntryCard';
 import { ExercisePicker } from './ExercisePicker';
 
@@ -67,9 +68,7 @@ function Home() {
       </div>
 
       <div className="pill-bar">
-        <label className="date-pill">
-          <input type="date" aria-label="תאריך האימון" value={date} onChange={(e) => setDate(e.target.value)} />
-        </label>
+        <DateField className="date-pill" label="תאריך האימון" value={date} onChange={setDate} />
         <button type="button" className="btn btn--primary" onClick={start} style={{ flex: '0 0 auto' }}>
           <Icon name="dumbbell" size={18} />
           התחל אימון
@@ -215,6 +214,7 @@ export function WorkoutHeadline({ workout }: { workout: Workout }) {
 
 function ActiveWorkout({ workout }: { workout: Workout }) {
   const { update, updateActive, navigate, exerciseById } = useApp();
+  const confirm = useConfirm();
   const [picking, setPicking] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -231,28 +231,37 @@ function ActiveWorkout({ workout }: { workout: Workout }) {
       ?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
   }, [selected?.id]);
 
-  const finish = () => {
+  const finish = async () => {
     const result = finishWorkout(workout, new Date());
     if (!result.ok) {
       setError(result.error);
       return;
     }
     const empty = workout.exercises.length - result.workout.exercises.length;
-    const question =
-      empty > 0
-        ? `לסיים את האימון? ${empty} תרגילים בלי סטים לא יישמרו.`
-        : 'לסיים את האימון ולשמור אותו בהיסטוריה?';
-    if (!window.confirm(question)) return;
+    const ok = await confirm({
+      title: 'לסיים את האימון?',
+      message:
+        empty > 0
+          ? `${empty} תרגילים בלי סטים לא יישמרו. השאר יישמר בהיסטוריה.`
+          : `${summary.setCount} סטים · נפח ${formatTotal(summary.volume)} ק"ג יישמרו בהיסטוריה.`,
+      confirmLabel: 'סיים ושמור',
+      cancelLabel: 'המשך להתאמן',
+    });
+    if (!ok) return;
     update((d) => ({ ...d, workouts: [...d.workouts, result.workout], activeWorkout: null }));
     navigate({ name: 'workoutDetail', workoutId: result.workout.id });
   };
 
-  const discard = () => {
-    const msg =
-      summary.setCount > 0
-        ? `לבטל את האימון? ${summary.setCount} הסטים שנרשמו יימחקו ולא יישמרו בהיסטוריה.`
-        : 'לבטל את האימון?';
-    if (window.confirm(msg)) update((d) => ({ ...d, activeWorkout: null }));
+  const discard = async () => {
+    const ok = await confirm({
+      title: 'לבטל את האימון?',
+      message:
+        summary.setCount > 0 ? `${summary.setCount} הסטים שנרשמו יימחקו ולא יישמרו בהיסטוריה.` : undefined,
+      confirmLabel: 'בטל אימון',
+      cancelLabel: 'חזור לאימון',
+      danger: true,
+    });
+    if (ok) update((d) => ({ ...d, activeWorkout: null }));
   };
 
   return (
@@ -282,17 +291,16 @@ function ActiveWorkout({ workout }: { workout: Workout }) {
       {(showDetails || workout.note !== '') && (
         <section className="card" aria-label="פרטי האימון">
           {showDetails && (
-            <label className="field">
+            <div className="field">
               <span className="field__label">תאריך</span>
-              <input
-                type="date"
-                className="input"
+              <DateField
+                label="תאריך האימון הפעיל"
                 value={workout.date}
-                onChange={(e) => {
-                  if (isValidDateString(e.target.value)) updateActive((w) => setWorkoutDate(w, e.target.value));
+                onChange={(value) => {
+                  if (isValidDateString(value)) updateActive((w) => setWorkoutDate(w, value));
                 }}
               />
-            </label>
+            </div>
           )}
           <label className="field">
             <span className="field__label">הערה לאימון</span>

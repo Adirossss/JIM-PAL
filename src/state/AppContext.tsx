@@ -32,6 +32,11 @@ interface AppContextValue {
 
 const AppContext = createContext<AppContextValue | null>(null);
 
+/** Screens scroll inside the app shell's scroll area, not the window. */
+function scrollToTop(): void {
+  document.querySelector('.screen-scroll')?.scrollTo(0, 0);
+}
+
 function historyDepth(): number | null {
   const state: unknown = window.history.state;
   if (typeof state === 'object' && state !== null && typeof (state as { depth?: unknown }).depth === 'number') {
@@ -93,7 +98,7 @@ export function AppProvider({ initial, children }: { initial: InitialState; chil
       window.history.pushState({ depth: (historyDepth() ?? 0) + 1 }, '', hash);
     }
     setRoute(next);
-    window.scrollTo(0, 0);
+    scrollToTop();
   }, []);
 
   const goBack = useCallback((fallback: Route) => {
@@ -102,7 +107,7 @@ export function AppProvider({ initial, children }: { initial: InitialState; chil
     } else {
       window.history.replaceState({ depth: 0 }, '', routeToHash(fallback));
       setRoute(fallback);
-      window.scrollTo(0, 0);
+      scrollToTop();
     }
   }, []);
 

@@ -16,6 +16,7 @@ import {
   validateSetInput,
 } from '../lib/workout';
 import { useApp } from '../state/AppContext';
+import { useConfirm } from '../state/confirm';
 import type { EquipmentType, SetEntry, Workout, WorkoutExercise } from '../types';
 import { ExerciseTags, ExerciseTitle, Icon, formatSet, useExercise } from './common';
 
@@ -30,6 +31,7 @@ interface Props {
 
 export function ExerciseEntryCard({ workout, entry, index, onRemoved }: Props) {
   const { data, updateActive, navigate } = useApp();
+  const confirm = useConfirm();
   const { exercise } = useExercise(entry.exerciseId);
   const history = data.workouts;
   const formId = useId();
@@ -40,8 +42,16 @@ export function ExerciseEntryCard({ workout, entry, index, onRemoved }: Props) {
   const canDuplicate = entry.sets.length > 0 || lastLoggedSet(entry.exerciseId, null, history) !== null;
   const editing = entry.sets.find((s) => s.id === editingId) ?? null;
 
-  const remove = () => {
-    if (entry.sets.length > 0 && !window.confirm(`להסיר את "${exercise.nameHe}" ואת ${entry.sets.length} הסטים שלו?`)) {
+  const remove = async () => {
+    if (
+      entry.sets.length > 0 &&
+      !(await confirm({
+        title: `להסיר את "${exercise.nameHe}"?`,
+        message: `${entry.sets.length} הסטים שלו באימון הזה יימחקו.`,
+        confirmLabel: 'הסר תרגיל',
+        danger: true,
+      }))
+    ) {
       return;
     }
     updateActive((w) => removeExercise(w, entry.id));
@@ -111,8 +121,14 @@ export function ExerciseEntryCard({ workout, entry, index, onRemoved }: Props) {
             updateActive((w) => updateSet(w, entry.id, editing.id, values));
             setEditingId(null);
           }}
-          onDelete={() => {
-            if (!window.confirm(`למחוק את סט ${entry.sets.indexOf(editing) + 1}?`)) return;
+          onDelete={async () => {
+            const ok = await confirm({
+              title: `למחוק את סט ${entry.sets.indexOf(editing) + 1}?`,
+              message: formatSet(editing, exercise.equipment),
+              confirmLabel: 'מחק סט',
+              danger: true,
+            });
+            if (!ok) return;
             updateActive((w) => deleteSet(w, entry.id, editing.id));
             setEditingId(null);
           }}

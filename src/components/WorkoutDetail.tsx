@@ -1,11 +1,13 @@
 import { formatDateHe, formatKg, formatTotal, weekdayHe } from '../lib/format';
 import { bestSet, setOneRepMax, summarizeWorkout, totalVolume } from '../lib/stats';
 import { useApp } from '../state/AppContext';
+import { useConfirm } from '../state/confirm';
 import type { WorkoutExercise } from '../types';
 import { BackButton, EmptyState, ExerciseTags, ExerciseTitle, Icon, ScreenHeader, useExercise } from './common';
 
 export function WorkoutDetail({ workoutId }: { workoutId: string }) {
   const { data, update, goBack, navigate } = useApp();
+  const confirm = useConfirm();
   const workout = data.workouts.find((w) => w.id === workoutId);
   const back = <BackButton onClick={() => goBack({ name: 'history' })} />;
 
@@ -23,8 +25,14 @@ export function WorkoutDetail({ workoutId }: { workoutId: string }) {
     ? Math.round((Date.parse(workout.finishedAt) - Date.parse(workout.startedAt)) / 60_000)
     : null;
 
-  const remove = () => {
-    if (!window.confirm('למחוק את האימון הזה מההיסטוריה? אי אפשר לבטל את הפעולה.')) return;
+  const remove = async () => {
+    const ok = await confirm({
+      title: 'למחוק את האימון?',
+      message: 'האימון יימחק מההיסטוריה. אי אפשר לבטל את הפעולה.',
+      confirmLabel: 'מחק אימון',
+      danger: true,
+    });
+    if (!ok) return;
     update((d) => ({ ...d, workouts: d.workouts.filter((w) => w.id !== workoutId) }));
     navigate({ name: 'history' }, { replace: true });
   };

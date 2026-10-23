@@ -1,6 +1,7 @@
 import { useRef, useState, type ChangeEvent } from 'react';
 import { exportFileName, parseImport, serializeExport } from '../lib/schema';
 import { useApp } from '../state/AppContext';
+import { useConfirm } from '../state/confirm';
 import { ScreenHeader } from './common';
 import { Stat } from './WorkoutDetail';
 
@@ -10,6 +11,7 @@ type Status = { kind: 'success'; message: string } | { kind: 'error'; message: s
 
 export function DataScreen() {
   const { data, update } = useApp();
+  const confirm = useConfirm();
   const fileInput = useRef<HTMLInputElement>(null);
   const [status, setStatus] = useState<Status>(null);
 
@@ -51,14 +53,15 @@ export function DataScreen() {
     }
 
     const incoming = result.value;
-    const ok = window.confirm(
-      [
+    const ok = await confirm({
+      title: 'להחליף את כל הנתונים?',
+      message:
         `הקובץ מכיל ${incoming.workouts.length} אימונים ו-${incoming.customExercises.length} תרגילים מותאמים` +
-          (incoming.activeWorkout ? ' ואימון פעיל.' : '.'),
-        `הייבוא יחליף את כל הנתונים הנוכחיים (${data.workouts.length} אימונים).`,
-        'מומלץ לייצא גיבוי לפני כן. להמשיך?',
-      ].join('\n'),
-    );
+        (incoming.activeWorkout ? ' ואימון פעיל' : '') +
+        `. הוא יחליף את הנתונים הנוכחיים (${data.workouts.length} אימונים). מומלץ לייצא גיבוי לפני כן.`,
+      confirmLabel: 'ייבא והחלף',
+      danger: true,
+    });
     if (!ok) return;
     update(() => incoming);
     setStatus({ kind: 'success', message: `יובאו ${incoming.workouts.length} אימונים.` });

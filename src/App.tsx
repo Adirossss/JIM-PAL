@@ -1,5 +1,6 @@
-import { tabOf, type Route, type Tab } from './lib/route';
+import { routeToHash, tabOf, type Route, type Tab } from './lib/route';
 import { AppProvider, useApp, type InitialState } from './state/AppContext';
+import { ConfirmProvider } from './state/confirm';
 import { useUpdateCheck } from './state/useUpdateCheck';
 import { Icon, type IconName } from './components/common';
 import { DataScreen } from './components/DataScreen';
@@ -12,18 +13,28 @@ import { WorkoutScreen } from './components/WorkoutScreen';
 export function App({ initial }: { initial: InitialState }) {
   return (
     <AppProvider initial={initial}>
-      <Shell />
+      <ConfirmProvider>
+        <Shell />
+      </ConfirmProvider>
     </AppProvider>
   );
 }
 
+/**
+ * A fixed full-screen shell: only the screen area scrolls, so the page itself
+ * never bounces or shows a scrollbar the way a website does.
+ */
 function Shell() {
   const { route } = useApp();
   return (
     <div className="app">
       <Notices />
-      <main className="content">
-        <Screen route={route} />
+      <main className="screen-scroll">
+        <div className="content">
+          <div className="screen" key={routeToHash(route)}>
+            <Screen route={route} />
+          </div>
+        </div>
       </main>
       <TabBar active={tabOf(route)} />
     </div>

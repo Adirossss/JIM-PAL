@@ -1,5 +1,5 @@
 import { useEffect, type ReactNode } from 'react';
-import { formatKg } from '../lib/format';
+import { formatDateHe, formatKg, isValidDateString, relativeDayHe, toLocalDateString, weekdayHe } from '../lib/format';
 import { useApp } from '../state/AppContext';
 import { EQUIPMENT_LABELS_HE, MUSCLE_LABELS_HE, type EquipmentType, type Exercise, type SetEntry } from '../types';
 
@@ -73,6 +73,50 @@ export function ScreenHeader({
       </div>
       <div className="screen-header__slot screen-header__slot--wide">{end}</div>
     </header>
+  );
+}
+
+/**
+ * Date picker that reads like the app: shows "היום · 23.10.2026" in Hebrew,
+ * while an invisible native date input on top opens the phone's own date
+ * wheel on tap (the native control would show the device's locale format).
+ */
+export function DateField({
+  value,
+  onChange,
+  label,
+  className = '',
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  label: string;
+  className?: string;
+}) {
+  const today = toLocalDateString(new Date());
+  let text = 'בחר תאריך';
+  if (isValidDateString(value)) {
+    const relative = relativeDayHe(value, today);
+    text = relative === formatDateHe(value) ? `${weekdayHe(value)}, ${relative}` : `${relative} · ${formatDateHe(value)}`;
+  }
+  return (
+    <label className={`date-field ${className}`}>
+      <Icon name="calendar" size={18} />
+      <span className="date-field__text">{text}</span>
+      <input
+        type="date"
+        className="date-field__native"
+        aria-label={label}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onClick={(e) => {
+          try {
+            e.currentTarget.showPicker?.();
+          } catch {
+            // Some browsers only allow showPicker from certain gestures; the tap still focuses the input.
+          }
+        }}
+      />
+    </label>
   );
 }
 
