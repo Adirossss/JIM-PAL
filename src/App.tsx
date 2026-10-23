@@ -1,5 +1,6 @@
 import { tabOf, type Route, type Tab } from './lib/route';
 import { AppProvider, useApp, type InitialState } from './state/AppContext';
+import { useUpdateCheck } from './state/useUpdateCheck';
 import { DataScreen } from './components/DataScreen';
 import { ExerciseDetail } from './components/ExerciseDetail';
 import { ExercisesScreen, NewExerciseScreen } from './components/ExercisesScreen';
@@ -52,10 +53,24 @@ function Screen({ route }: { route: Route }) {
   }
 }
 
+function UpdateBanner() {
+  const { update, apply } = useUpdateCheck();
+  if (!update) return null;
+  return (
+    <div className="update-banner" role="status">
+      <span>🎉 יש גרסה חדשה של האפליקציה</span>
+      <button type="button" className="btn btn--primary btn--small" onClick={apply}>
+        עדכן עכשיו
+      </button>
+    </div>
+  );
+}
+
 function Notices() {
   const { loadResult, saveError, persistent } = useApp();
   return (
     <>
+      <UpdateBanner />
       {!persistent && (
         <div className="notice notice--warn" role="status">
           הדפדפן חוסם אחסון מקומי, לכן הנתונים לא יישמרו אחרי סגירת הדף.

@@ -75,6 +75,9 @@ export function DataScreen() {
         <p className="small muted">
           הנתונים נשמרים רק בדפדפן הזה, במכשיר הזה. ניקוי נתוני האתר בדפדפן ימחק אותם, לכן כדאי לייצא גיבוי מדי פעם.
         </p>
+        <p className="small muted">
+          גרסה <bdi>{__APP_VERSION__}</bdi> · נבנתה ב-{new Date(__BUILT_AT__).toLocaleString('he-IL')}
+        </p>
       </section>
 
       <section className="card">

@@ -880,6 +880,21 @@ select.input {
   color: var(--danger);
 }
 
+.update-banner {
+  position: sticky;
+  top: 0;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 16px;
+  background: var(--primary-soft);
+  color: var(--text);
+  font-weight: 600;
+  border-bottom: 1px solid var(--border);
+}
+
 .notice--success {
   background: var(--accent-soft);
   color: var(--accent);
