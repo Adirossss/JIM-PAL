@@ -105,6 +105,7 @@ export function DataScreen() {
           <Stat label="אימון פעיל" value={data.activeWorkout ? 'כן' : 'לא'} />
           <Stat label="תבניות" value={String(data.templates.length)} />
           <Stat label="מועדפים" value={String(data.favoriteExerciseIds.length)} />
+          <Stat label="מדידות גוף" value={String(data.bodyEntries.length)} />
         </div>
         <p className="small muted">
           הנתונים נשמרים רק בדפדפן הזה, במכשיר הזה. ניקוי נתוני האתר בדפדפן ימחק אותם, לכן כדאי לייצא גיבוי מדי פעם.
@@ -116,7 +117,7 @@ export function DataScreen() {
 
       <section className="card">
         <h2>ייצוא</h2>
-        <p className="small muted">שומר את כל האימונים, התבניות, המועדפים והאימון הפעיל לקובץ JSON. בטלפון נפתח תפריט השיתוף: אפשר לשמור ב"קבצים" או לשלוח לעצמך.</p>
+        <p className="small muted">שומר את כל האימונים, התבניות, המועדפים, מדידות הגוף והאימון הפעיל לקובץ JSON. בטלפון נפתח תפריט השיתוף: אפשר לשמור ב"קבצים" או לשלוח לעצמך.</p>
         <p className="small">
           גיבוי אחרון: {backup.days === null ? 'עוד לא גיבית במכשיר הזה' : backup.days === 0 ? 'היום' : backup.days === 1 ? 'אתמול' : `לפני ${backup.days} ימים`}
         </p>

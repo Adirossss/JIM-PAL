@@ -34,6 +34,7 @@ import {
   supersetGroup,
 } from '../lib/workout';
 import { sortTemplates } from '../lib/templates';
+import { bodyChange, formatBodyChange } from '../lib/body';
 import { useApp } from '../state/AppContext';
 import { exportBackup, useBackupReminder } from '../state/backup';
 import { useConfirm } from '../state/confirm';
@@ -119,6 +120,7 @@ function Home() {
             <p className="muted small">אחרי שתסיים את האימון הראשון, יופיעו כאן הנפח, השיאים וההתקדמות.</p>
           </EmptyState>
         )}
+        <BodyCard />
       </section>
     </div>
   );
@@ -284,6 +286,43 @@ function WeekCard() {
         )}
       </div>
     </section>
+  );
+}
+
+/** Latest body weight and the change since the previous weigh-in; opens the body screen. */
+function BodyCard() {
+  const { data, navigate } = useApp();
+  const today = toLocalDateString(new Date());
+  const weight = bodyChange(data.bodyEntries, 'weight');
+
+  let text = 'רשום משקל ומדידות ועקוב אחרי השינוי';
+  if (weight) {
+    text = `${formatKg(weight.latest.value)} ק"ג · ${relativeDayHe(weight.latest.date, today)}`;
+  } else if (data.bodyEntries.length > 0) {
+    text = `${data.bodyEntries.length} מדידות היקפים`;
+  }
+
+  return (
+    <button type="button" className="card card--link body-card" onClick={() => navigate({ name: 'body' })}>
+      <span className="suggest-set__icon" aria-hidden="true">
+        <Icon name="scale" />
+      </span>
+      <span className="headline" style={{ flex: 1 }}>
+        <span className="headline__date">משקל גוף ומדידות</span>
+        <span className="headline__stats">
+          {text}
+          {weight?.sincePrevious != null && (
+            <>
+              {' · '}
+              <bdi>{formatBodyChange(weight.sincePrevious, 'weight')}</bdi>
+            </>
+          )}
+        </span>
+      </span>
+      <span className="go-circle" aria-hidden="true">
+        <Icon name="go" size={18} />
+      </span>
+    </button>
   );
 }
 

@@ -48,6 +48,7 @@ const ICON_PATHS = {
   link: 'M10 14a4 4 0 0 0 5.66 0l3-3a4 4 0 0 0-5.66-5.66l-1 1M14 10a4 4 0 0 0-5.66 0l-3 3a4 4 0 0 0 5.66 5.66l1-1',
   flame: 'M12 3c.5 3 4 5 4 9.5a4 4 0 0 1-8 0c0-2 1-3.4 2.3-4.4-.1 1.8.7 3 1.7 3.4.2-3.1-.6-5.6 0-8.5z',
   bookmark: 'M7 4h10v16l-5-3.5L7 20z',
+  scale: 'M7 4h10a3 3 0 0 1 3 3v10a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3zM8.5 10a3.5 3.5 0 0 1 7 0M12 10l1.5-2',
 } as const;
 
 export type IconName = keyof typeof ICON_PATHS;

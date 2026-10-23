@@ -2053,3 +2053,28 @@ h2.exercise-title .exercise-title__he {
   background: var(--accent);
   box-shadow: 0 0 0 2px var(--surface);
 }
+
+/* ── Body weight & measurements ─────────────────────────── */
+
+.body-card {
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  padding-inline-start: 14px;
+}
+
+.body-fields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.body-fields .input {
+  padding-inline: 12px;
+  text-align: center;
+}
+
+.progress-hero .segmented {
+  background: var(--hero-btn);
+}

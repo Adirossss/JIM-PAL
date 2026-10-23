@@ -8,22 +8,37 @@ import { formatSet } from './common';
 const H = 220;
 const M = { top: 26, right: 16, bottom: 28, left: 44 };
 
-interface Props {
-  points: ProgressPoint[];
-  equipment: EquipmentType;
+export interface ChartPoint {
+  date: string;
+  value: number;
+  /** Extra text for the readout, e.g. the set behind an estimated 1RM. */
+  detail?: string;
+}
+
+interface LineChartProps {
+  points: ChartPoint[];
+  /** Unit shown after values, e.g. ק"ג. */
+  unit: string;
+  /** What is plotted, for screen readers. */
+  title: string;
+  /** Label the highest point and call it "שיא" (for strength, not for body weight). */
+  markMax?: boolean;
 }
 
 /**
- * Best estimated 1RM per workout date. Time runs left to right even in the
- * RTL layout. A crosshair snaps to the nearest date on hover/tap; arrow keys
- * do the same when the chart has focus. Every value is also in the sessions
- * list below the chart, so the readout never gates data.
+ * One value per date. Time runs left to right even in the RTL layout. A
+ * crosshair snaps to the nearest date on hover/tap; arrow keys do the same
+ * when the chart has focus. Every value is also listed below the chart, so
+ * the readout never gates data.
  */
-export function ProgressChart({ points, equipment }: Props) {
+export function LineChart({ points, unit, title, markMax = false }: LineChartProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
-  const [active, setActive] = useState<number>(points.length - 1);
-  const activeIndex = Math.min(Math.max(active, 0), points.length - 1);
+  // The latest point is shown until another is picked; a newly added point takes over again.
+  const [picked, setPicked] = useState<{ index: number; of: number } | null>(null);
+  const activeIndex =
+    picked && picked.of === points.length ? Math.min(Math.max(picked.index, 0), points.length - 1) : points.length - 1;
+  const setActive = (index: number) => setPicked({ index, of: points.length });
 
   // Draw in real CSS pixels (viewBox = rendered width) so axis text keeps its
   // size on a phone instead of shrinking with a scaled-down viewBox.
@@ -40,7 +55,7 @@ export function ProgressChart({ points, equipment }: Props) {
 
   const geo = useMemo(() => {
     const days = points.map((p) => dayNumber(p.date));
-    const values = points.map((p) => p.oneRepMax);
+    const values = points.map((p) => p.value);
     const scale = niceScale(Math.min(...values), Math.max(...values));
     const x = linear(days[0] ?? 0, days[days.length - 1] ?? 0, M.left, W - M.right);
     const y = linear(scale.min, scale.max, H - M.bottom, M.top);
@@ -80,16 +95,24 @@ export function ProgressChart({ points, equipment }: Props) {
   const current = points[activeIndex]!;
   const last = points.length - 1;
   const ax = geo.xs[activeIndex]!;
-  const labelled = new Set([last, geo.maxIndex]);
+  const labelled = new Set(markMax ? [last, geo.maxIndex] : [last]);
 
   return (
     <div className="stack" style={{ gap: 6 }}>
       <div className="chart-readout" aria-live="polite">
         <span className="chart-readout__key" aria-hidden="true" />
-        <span className="chart-readout__value">{formatKg(current.oneRepMax)} ק"ג</span>
+        <span className="chart-readout__value">
+          {formatKg(current.value)} {unit}
+        </span>
         <span className="chart-readout__meta">
-          {formatDateHe(current.date)} · <bdi>{formatSet(current.set, equipment)}</bdi>
-          {activeIndex === geo.maxIndex && points.length > 1 && ' · שיא'}
+          {formatDateHe(current.date)}
+          {current.detail && (
+            <>
+              {' · '}
+              <bdi>{current.detail}</bdi>
+            </>
+          )}
+          {markMax && activeIndex === geo.maxIndex && points.length > 1 && ' · שיא'}
         </span>
       </div>
       <div
@@ -97,7 +120,7 @@ export function ProgressChart({ points, equipment }: Props) {
         className="chart-wrap"
         tabIndex={0}
         role="group"
-        aria-label={`גרף 1RM משוער לאורך זמן, ${points.length} נקודות. חצים לניווט בין התאריכים.`}
+        aria-label={`גרף ${title} לאורך זמן, ${points.length} נקודות. חצים לניווט בין התאריכים.`}
         onKeyDown={onKey}
       >
         <svg ref={svgRef} className="chart" viewBox={`0 0 ${W} ${H}`} width={W} height={H} aria-hidden="true">
@@ -139,7 +162,7 @@ export function ProgressChart({ points, equipment }: Props) {
                 y={geo.ys[i]! - 12}
                 textAnchor={anchor}
               >
-                {formatKg(points[i]!.oneRepMax)}
+                {formatKg(points[i]!.value)}
               </text>
             );
           })}
@@ -157,4 +180,13 @@ export function ProgressChart({ points, equipment }: Props) {
       </div>
     </div>
   );
+}
+
+/** Best estimated 1RM per workout date, with the set behind it in the readout. */
+export function ProgressChart({ points, equipment }: { points: ProgressPoint[]; equipment: EquipmentType }) {
+  const chartPoints = useMemo(
+    () => points.map((p) => ({ date: p.date, value: p.oneRepMax, detail: formatSet(p.set, equipment) })),
+    [points, equipment],
+  );
+  return <LineChart points={chartPoints} unit={'ק"ג'} title="1RM משוער" markMax />;
 }

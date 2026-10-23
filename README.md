@@ -15,13 +15,27 @@ browser's `localStorage`.
   pre-filled from the last logged set of that exercise, and "duplicate last set"
   adds an identical set in one tap. For bodyweight exercises the weight is the
   optional *added* load (e.g. a dip belt). Notes per exercise and per workout.
-  An unfinished workout survives a page reload.
-- **History & progress** — past workouts grouped by month, newest first. For each
-  exercise: every past session, the best set, total volume (Σ weight × reps), the
-  estimated 1RM (Epley: `weight × (1 + reps / 30)`), and an SVG chart of the best
-  estimated 1RM over time.
+  An unfinished workout survives a page reload. A set can be marked as a
+  **drop set**, and neighbouring exercises can be linked into a **superset**
+  (after a set, the app jumps to the next exercise of the superset).
+- **Faster starts** — favorite exercises, workout templates, "repeat a past
+  workout", recently used exercises and "what else you did last time" suggestions.
+- **Coaching** — a 🏆 celebration when a set beats the exercise's best estimated
+  1RM, and a next-set recommendation (more weight after the top set was held
+  twice, otherwise one more rep). Drop sets are ignored for both.
+- **History & progress** — past workouts grouped by month, newest first; a
+  finished workout can be edited. For each exercise: every past session, the
+  best set, total volume (Σ weight × reps), the estimated 1RM (Epley:
+  `weight × (1 + reps / 30)`), and an SVG chart of the best estimated 1RM over time.
+- **This week** — workouts, sets and volume this week (Sunday to Saturday) with the
+  change from last week, a weekly streak, and sets per muscle group.
+- **Body weight & measurements** — log body weight and optional waist, chest and
+  arm measurements, see each one charted over time with the change since the
+  previous and the first measurement.
 - **Backup** — export all data to a JSON file and import it back. Imports are
   fully validated; a malformed file is rejected without touching existing data.
+  The home screen reminds you to back up after 3 new workouts, or after a week
+  with new workouts (snooze: 3 days).
 - **Updates** — every push to `main` is built and published to GitHub Pages by
   `.github/workflows/deploy.yml`. Each build writes `version.json`; the running
   app checks it on start, when it returns to the foreground and every 5 minutes,
@@ -63,12 +77,16 @@ npm run preview    # serve the production build locally
 ## How data is stored
 
 - All data lives under a single `localStorage` key, `jim-pal:data`, as one JSON
-  document with a `schemaVersion` field (currently `2`). Version 2 added
-  `favoriteExerciseIds` and `templates`; version 1 data (stored or imported) is
-  upgraded automatically by the migrations in `src/lib/schema.ts`.
+  document with a `schemaVersion` field (currently `3`). Version 2 added
+  `favoriteExerciseIds` and `templates`; version 3 added `bodyEntries` and the
+  optional `drop` (set) and `supersetId` (exercise in a workout) fields. Older data
+  (stored or imported) is upgraded automatically by the migrations in
+  `src/lib/schema.ts`.
 - `src/lib/storage.ts` is the only module that touches `localStorage`.
-- The light/dark choice (גיבוי → מראה: בהיר / כהה / לפי הטלפון, light by default) is a
-  per-device setting under its own key, `jim-pal:theme`; it is not part of the backup.
+- Per-device settings live under their own keys and are not part of the backup:
+  the light/dark choice (גיבוי → מראה: בהיר / כהה / לפי הטלפון, light by default) in
+  `jim-pal:theme`, and the backup reminder's state in `jim-pal:lastBackupAt` and
+  `jim-pal:backupSnoozedUntil`.
 - If stored data can't be read, it is copied to a backup key
   (`jim-pal:data:unreadable:<timestamp>`) instead of being overwritten, and the app
   starts empty with a warning.
@@ -83,15 +101,20 @@ src/
   data/exercises.ts    seed exercise library
   lib/                 pure, UI-free logic (each file has a *.test.ts next to it)
     exercises.ts       search, filters, custom exercises
-    stats.ts           volume, Epley 1RM, best set, history, grouping, progress series
-    workout.ts         workout/set operations, pre-fill, input validation
+    stats.ts           volume, Epley 1RM, best set, records, weekly summary, progress series
+    workout.ts         workout/set operations, supersets, pre-fill, recommendations, validation
+    templates.ts       favorites and workout templates
+    body.ts            body weight and measurements
+    backup.ts          when to show the backup reminder
+    theme.ts           light / dark / follow-the-phone
     schema.ts          schema version, migrations, import validation, export
     storage.ts         the localStorage data-access module
     format.ts          dates and number parsing/formatting
-    chart.ts           axis math for the SVG chart
+    chart.ts           axis math for the SVG charts
     route.ts           hash-based routes
+    version.ts         comparing the running build with the published one
     ids.ts             ID generation
-  state/AppContext.tsx app state, persistence and navigation
+  state/               app state, persistence, navigation, theme, confirm sheets
   components/          React screens and components
 ```
 
