@@ -22,6 +22,13 @@ browser's `localStorage`.
   estimated 1RM over time.
 - **Backup** — export all data to a JSON file and import it back. Imports are
   fully validated; a malformed file is rejected without touching existing data.
+- **Updates** — every push to `main` is built and published to GitHub Pages by
+  `.github/workflows/deploy.yml`. Each build writes `version.json`; the running
+  app checks it on start, when it returns to the foreground and every 5 minutes,
+  and offers a one-tap "עדכן עכשיו" banner when a newer build is live.
+
+The UI uses the Heebo font, bundled in `src/fonts/` under the SIL Open Font License
+(`src/fonts/OFL.txt`).
 
 ## Requirements
 

@@ -6,6 +6,7 @@ import {
   isValidDateString,
   parseReps,
   parseWeight,
+  relativeDayHe,
   toLocalDateString,
   weekdayHe,
 } from './format';
@@ -24,6 +25,13 @@ describe('dates', () => {
     expect(isValidDateString('2026-1-01')).toBe(false);
     expect(isValidDateString('22/10/2026')).toBe(false);
     expect(isValidDateString('')).toBe(false);
+  });
+
+  it('says today / yesterday when it can', () => {
+    expect(relativeDayHe('2026-10-24', '2026-10-24')).toBe('היום');
+    expect(relativeDayHe('2026-10-23', '2026-10-24')).toBe('אתמול');
+    expect(relativeDayHe('2026-10-31', '2026-11-01')).toBe('אתמול');
+    expect(relativeDayHe('2026-10-20', '2026-10-24')).toBe('20.10.2026');
   });
 
   it('formats dates for display in Hebrew', () => {

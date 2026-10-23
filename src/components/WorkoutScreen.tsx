@@ -1,55 +1,201 @@
-import { useMemo, useState } from 'react';
-import { formatDateHe, formatTotal, isValidDateString, toLocalDateString, weekdayHe } from '../lib/format';
-import { summarizeWorkout, sortWorkoutsNewestFirst } from '../lib/stats';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  formatDateHe,
+  formatKg,
+  formatTotal,
+  isValidDateString,
+  relativeDayHe,
+  toLocalDateString,
+  weekdayHe,
+} from '../lib/format';
+import { createId } from '../lib/ids';
+import {
+  countWorkoutsThisWeek,
+  percentChange,
+  recentHighlights,
+  recentVolumes,
+  recentlyUsedExerciseIds,
+  sortWorkoutsNewestFirst,
+  summarizeWorkout,
+} from '../lib/stats';
 import { addExercise, finishWorkout, setWorkoutDate, setWorkoutNote, startWorkout } from '../lib/workout';
 import { useApp } from '../state/AppContext';
-import type { Workout } from '../types';
+import { MUSCLE_LABELS_HE, type Workout } from '../types';
+import { EmptyState, Icon, ScreenHeader } from './common';
 import { ExerciseEntryCard } from './ExerciseEntryCard';
 import { ExercisePicker } from './ExercisePicker';
-import { EmptyState } from './common';
 
 export function WorkoutScreen() {
   const { data } = useApp();
-  return data.activeWorkout ? <ActiveWorkout workout={data.activeWorkout} /> : <StartWorkout />;
+  return data.activeWorkout ? <ActiveWorkout workout={data.activeWorkout} /> : <Home />;
 }
 
-function StartWorkout() {
-  const { data, update, navigate } = useApp();
-  const [date, setDate] = useState(() => toLocalDateString(new Date()));
+function Home() {
+  const { data, update, navigate, exerciseById } = useApp();
+  const today = toLocalDateString(new Date());
+  const [date, setDate] = useState(today);
   const last = sortWorkoutsNewestFirst(data.workouts)[0];
+  const weekCount = countWorkoutsThisWeek(data.workouts, today);
 
   const start = () => {
-    const d = isValidDateString(date) ? date : toLocalDateString(new Date());
+    const d = isValidDateString(date) ? date : today;
     update((prev) => ({ ...prev, activeWorkout: startWorkout(new Date(), d) }));
   };
 
   return (
     <div className="stack">
-      <section className="card hero">
-        <h2>אימון חדש</h2>
-        <label className="field">
-          <span className="field__label">תאריך</span>
-          <input type="date" className="input" value={date} onChange={(e) => setDate(e.target.value)} />
+      <ScreenHeader
+        start={
+          <span className="logo-mark" aria-hidden="true">
+            <Icon name="dumbbell" />
+          </span>
+        }
+        title={<span className="brand-word">JIM-PAL</span>}
+        end={
+          <button type="button" className="icon-btn" aria-label="גיבוי" onClick={() => navigate({ name: 'data' })}>
+            <Icon name="backup" />
+          </button>
+        }
+      />
+
+      <div className="hero-text">
+        <h1>מוכן לאימון?</h1>
+        <p className="muted small">
+          {weekdayHe(today)}, {formatDateHe(today)}
+          {weekCount > 0 && ` · ${weekCount} אימונים השבוע`}
+        </p>
+      </div>
+
+      <div className="pill-bar">
+        <label className="date-pill">
+          <input type="date" aria-label="תאריך האימון" value={date} onChange={(e) => setDate(e.target.value)} />
         </label>
-        <button type="button" className="btn btn--primary btn--large btn--block" onClick={start}>
+        <button type="button" className="btn btn--primary" onClick={start} style={{ flex: '0 0 auto' }}>
+          <Icon name="dumbbell" size={18} />
           התחל אימון
         </button>
-      </section>
+      </div>
 
-      {last && (
-        <button
-          type="button"
-          className="card card--link"
-          onClick={() => navigate({ name: 'workoutDetail', workoutId: last.id })}
-        >
-          <span className="muted">האימון האחרון</span>
-          <WorkoutHeadline workout={last} />
-        </button>
-      )}
+      <section className="sheet" aria-label="סיכום">
+        {last ? (
+          <>
+            {recentExerciseChips(recentlyUsedExerciseIds(data.workouts).slice(0, 8))}
+            {lastWorkoutCard(last)}
+            {highlights()}
+          </>
+        ) : (
+          <EmptyState title="עוד אין אימונים">
+            <p className="muted small">אחרי שתסיים את האימון הראשון, יופיעו כאן הנפח, השיאים וההתקדמות.</p>
+          </EmptyState>
+        )}
+      </section>
     </div>
   );
+
+  function recentExerciseChips(ids: string[]) {
+    if (ids.length === 0) return null;
+    return (
+      <div className="chips chips--scroll" aria-label="תרגילים אחרונים">
+        {ids.map((id, i) => (
+          <button
+            key={id}
+            type="button"
+            className={`chip ${i === 0 ? 'chip--on' : 'chip--surface'}`}
+            onClick={() => navigate({ name: 'exerciseDetail', exerciseId: id })}
+          >
+            {exerciseById.get(id)?.nameHe ?? 'תרגיל לא מוכר'}
+          </button>
+        ))}
+      </div>
+    );
+  }
+
+  function lastWorkoutCard(workout: Workout) {
+    const volumes = recentVolumes(data.workouts, 6);
+    const max = Math.max(...volumes.map((v) => v.volume), 1);
+    const s = summarizeWorkout(workout);
+    const previous = volumes[volumes.length - 2];
+    const change = previous ? percentChange(previous.volume, s.volume) : null;
+    const muscles = [
+      ...new Set(
+        workout.exercises.map((e) => {
+          const m = exerciseById.get(e.exerciseId)?.primaryMuscle;
+          return m ? MUSCLE_LABELS_HE[m] : 'אחר';
+        }),
+      ),
+    ];
+
+    return (
+      <div className="card card--tight">
+        <div className="panel">
+          <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div className="hero-text" style={{ gap: 2 }}>
+              <span className="muted small">נפח כולל באימון האחרון</span>
+              <span className="big-number">
+                {formatTotal(s.volume)} <small>ק"ג</small>
+              </span>
+            </div>
+            {change !== null && (
+              <span className={`badge ${change >= 0 ? 'badge--accent' : ''}`}>
+                <bdi>{change > 0 ? `+${change}%` : `${change}%`}</bdi>&nbsp;מהקודם
+              </span>
+            )}
+          </div>
+          {volumes.length > 1 && (
+            <div className="bars" aria-hidden="true" style={{ direction: 'ltr' }}>
+              {volumes.map((v, i) => (
+                <div
+                  key={v.workoutId}
+                  className={`bars__bar ${i === volumes.length - 1 ? 'bars__bar--accent' : ''}`}
+                  style={{ height: `${Math.max(8, (v.volume / max) * 100)}%` }}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+        <button
+          type="button"
+          className="card-row-link"
+          onClick={() => navigate({ name: 'workoutDetail', workoutId: workout.id })}
+        >
+          <span className="headline">
+            <span className="headline__date">{muscles.join(', ')}</span>
+            <span className="headline__stats">
+              {relativeDayHe(workout.date, today)} · {s.exerciseCount} תרגילים · {s.setCount} סטים
+            </span>
+          </span>
+          <span className="go-circle" aria-hidden="true">
+            <Icon name="go" size={18} />
+          </span>
+        </button>
+      </div>
+    );
+  }
+
+  function highlights() {
+    const items = recentHighlights(data.workouts, 2);
+    if (items.length === 0) return null;
+    return (
+      <div className="stat-grid" style={{ gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' }}>
+        {items.map((h) => (
+          <button
+            key={h.exerciseId}
+            type="button"
+            className="stat card--link"
+            onClick={() => navigate({ name: 'exerciseDetail', exerciseId: h.exerciseId })}
+          >
+            <span className="stat__label">{exerciseById.get(h.exerciseId)?.nameHe ?? 'תרגיל לא מוכר'}</span>
+            <span className="stat__value">
+              {formatKg(h.bestOneRepMax)} <small className="muted small">1RM משוער</small>
+            </span>
+          </button>
+        ))}
+      </div>
+    );
+  }
 }
 
+/** Headline used by the history list. */
 export function WorkoutHeadline({ workout }: { workout: Workout }) {
   const { exerciseById } = useApp();
   const s = summarizeWorkout(workout);
@@ -62,17 +208,28 @@ export function WorkoutHeadline({ workout }: { workout: Workout }) {
       <span className="headline__stats">
         {s.exerciseCount} תרגילים · {s.setCount} סטים · נפח {formatTotal(s.volume)} ק"ג
       </span>
-      {names.length > 0 && <span className="headline__names muted">{names.join(' · ')}</span>}
+      {names.length > 0 && <span className="headline__names">{names.join(' · ')}</span>}
     </span>
   );
 }
 
 function ActiveWorkout({ workout }: { workout: Workout }) {
-  const { data, update, updateActive, navigate } = useApp();
+  const { update, updateActive, navigate, exerciseById } = useApp();
   const [picking, setPicking] = useState(false);
+  const [showDetails, setShowDetails] = useState(false);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const addedIds = useMemo(() => new Set(workout.exercises.map((e) => e.exerciseId)), [workout.exercises]);
   const summary = summarizeWorkout(workout);
+  // The chosen exercise, else the most recently added one.
+  const selected = workout.exercises.find((e) => e.id === selectedId) ?? workout.exercises.at(-1);
+
+  // Keep the selected chip visible in the horizontally scrolling row.
+  useEffect(() => {
+    document
+      .querySelector('[role="tab"][aria-selected="true"]')
+      ?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  }, [selected?.id]);
 
   const finish = () => {
     const result = finishWorkout(workout, new Date());
@@ -100,49 +257,55 @@ function ActiveWorkout({ workout }: { workout: Workout }) {
 
   return (
     <div className="stack">
-      <section className="card">
-        <div className="active-header">
-          <h2>אימון פעיל</h2>
-          <span className="muted">
-            {summary.setCount} סטים · נפח {formatTotal(summary.volume)} ק"ג
-          </span>
-        </div>
-        <label className="field">
-          <span className="field__label">תאריך</span>
-          <input
-            type="date"
-            className="input"
-            value={workout.date}
-            onChange={(e) => {
-              if (isValidDateString(e.target.value)) updateActive((w) => setWorkoutDate(w, e.target.value));
-            }}
-          />
-        </label>
-        <label className="field">
-          <span className="field__label">הערה לאימון</span>
-          <textarea
-            className="input note"
-            rows={2}
-            placeholder="איך הרגשת, מה לשפר…"
-            value={workout.note}
-            onChange={(e) => updateActive((w) => setWorkoutNote(w, e.target.value))}
-          />
-        </label>
-      </section>
+      <ScreenHeader
+        start={
+          <button
+            type="button"
+            className={`icon-btn ${showDetails ? 'icon-btn--dark' : ''}`}
+            aria-label="תאריך והערה לאימון"
+            aria-expanded={showDetails}
+            onClick={() => setShowDetails((v) => !v)}
+          >
+            <Icon name="note" />
+          </button>
+        }
+        title="אימון פעיל"
+        subtitle={`${summary.setCount} סטים · נפח ${formatTotal(summary.volume)} ק"ג`}
+        end={
+          <button type="button" className="btn btn--primary btn--small" onClick={finish}>
+            <Icon name="check" size={16} />
+            סיים
+          </button>
+        }
+      />
 
-      {workout.exercises.length === 0 ? (
-        <EmptyState title="עוד לא הוספת תרגילים">
-          <p className="muted">הוסף תרגיל מהספרייה כדי להתחיל לרשום סטים.</p>
-        </EmptyState>
-      ) : (
-        workout.exercises.map((entry, i) => (
-          <ExerciseEntryCard key={entry.id} workout={workout} entry={entry} index={i} />
-        ))
+      {(showDetails || workout.note !== '') && (
+        <section className="card" aria-label="פרטי האימון">
+          {showDetails && (
+            <label className="field">
+              <span className="field__label">תאריך</span>
+              <input
+                type="date"
+                className="input"
+                value={workout.date}
+                onChange={(e) => {
+                  if (isValidDateString(e.target.value)) updateActive((w) => setWorkoutDate(w, e.target.value));
+                }}
+              />
+            </label>
+          )}
+          <label className="field">
+            <span className="field__label">הערה לאימון</span>
+            <textarea
+              className="input"
+              rows={2}
+              placeholder="איך הרגשת, מה לשפר…"
+              value={workout.note}
+              onChange={(e) => updateActive((w) => setWorkoutNote(w, e.target.value))}
+            />
+          </label>
+        </section>
       )}
-
-      <button type="button" className="btn btn--secondary btn--large btn--block" onClick={() => setPicking(true)}>
-        + הוסף תרגיל
-      </button>
 
       {error && (
         <p className="error" role="alert">
@@ -150,10 +313,47 @@ function ActiveWorkout({ workout }: { workout: Workout }) {
         </p>
       )}
 
-      <div className="finish-bar">
-        <button type="button" className="btn btn--primary btn--large" onClick={finish}>
-          ✓ סיים אימון
+      <div className="chips chips--scroll" role="tablist" aria-label="תרגילים באימון">
+        <button type="button" className="chip chip--icon" aria-label="הוסף תרגיל" onClick={() => setPicking(true)}>
+          <Icon name="plus" size={18} />
         </button>
+        {workout.exercises.map((e) => {
+          const on = e.id === selected?.id;
+          return (
+            <button
+              key={e.id}
+              type="button"
+              role="tab"
+              aria-selected={on}
+              className={`chip ${on ? 'chip--on' : 'chip--surface'}`}
+              onClick={() => setSelectedId(e.id)}
+            >
+              {e.sets.length > 0 && !on && <span className="chip__dot" aria-hidden="true" />}
+              {exerciseById.get(e.exerciseId)?.nameHe ?? 'תרגיל לא מוכר'}
+            </button>
+          );
+        })}
+      </div>
+
+      {selected ? (
+        <ExerciseEntryCard
+          key={selected.id}
+          workout={workout}
+          entry={selected}
+          index={workout.exercises.indexOf(selected)}
+          onRemoved={() => setSelectedId(null)}
+        />
+      ) : (
+        <EmptyState title="עוד לא הוספת תרגילים">
+          <p className="muted small">בחר תרגיל מהספרייה כדי להתחיל לרשום סטים.</p>
+          <button type="button" className="btn btn--primary" onClick={() => setPicking(true)}>
+            <Icon name="plus" size={18} />
+            הוסף תרגיל
+          </button>
+        </EmptyState>
+      )}
+
+      <div className="finish-bar">
         <button type="button" className="btn btn--ghost btn--danger" onClick={discard}>
           בטל אימון
         </button>
@@ -164,18 +364,13 @@ function ActiveWorkout({ workout }: { workout: Workout }) {
           markedIds={addedIds}
           onClose={() => setPicking(false)}
           onPick={(exercise) => {
+            const entryId = createId();
             setError(null);
-            updateActive((w) => addExercise(w, exercise.id));
+            updateActive((w) => addExercise(w, exercise.id, () => entryId));
+            setSelectedId(entryId);
             setPicking(false);
-            // Let the new card render, then bring it into view.
-            requestAnimationFrame(() =>
-              window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }),
-            );
           }}
         />
-      )}
-      {data.workouts.length === 0 && workout.exercises.length > 0 && (
-        <p className="muted center small">טיפ: “שכפל סט אחרון” מוסיף בלחיצה אחת סט זהה לקודם.</p>
       )}
     </div>
   );

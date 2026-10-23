@@ -2,16 +2,17 @@ import { formatDateHe, formatKg, formatTotal, weekdayHe } from '../lib/format';
 import { bestSet, setOneRepMax, summarizeWorkout, totalVolume } from '../lib/stats';
 import { useApp } from '../state/AppContext';
 import type { WorkoutExercise } from '../types';
-import { BackButton, EmptyState, ExerciseTags, ExerciseTitle, useExercise } from './common';
+import { BackButton, EmptyState, ExerciseTags, ExerciseTitle, Icon, ScreenHeader, useExercise } from './common';
 
 export function WorkoutDetail({ workoutId }: { workoutId: string }) {
   const { data, update, goBack, navigate } = useApp();
   const workout = data.workouts.find((w) => w.id === workoutId);
+  const back = <BackButton onClick={() => goBack({ name: 'history' })} />;
 
   if (!workout) {
     return (
       <div className="stack">
-        <BackButton onClick={() => goBack({ name: 'history' })} />
+        <ScreenHeader start={back} title="אימון" />
         <EmptyState title="האימון לא נמצא" />
       </div>
     );
@@ -30,16 +31,19 @@ export function WorkoutDetail({ workoutId }: { workoutId: string }) {
 
   return (
     <div className="stack">
-      <BackButton onClick={() => goBack({ name: 'history' })} />
-      <section className="card">
-        <h2>
-          {weekdayHe(workout.date)}, {formatDateHe(workout.date)}
-        </h2>
-        <div className="stat-grid">
+      <ScreenHeader start={back} title={formatDateHe(workout.date)} subtitle={weekdayHe(workout.date)} />
+
+      <section className="card card--tight">
+        <div className="panel">
+          <span className="muted small">נפח כולל</span>
+          <span className="big-number">
+            {formatTotal(s.volume)} <small>ק"ג</small>
+          </span>
+        </div>
+        <div className="stat-grid" style={{ gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' }}>
           <Stat label="תרגילים" value={String(s.exerciseCount)} />
           <Stat label="סטים" value={String(s.setCount)} />
-          <Stat label='נפח כולל (ק"ג)' value={formatTotal(s.volume)} />
-          {minutes !== null && minutes >= 0 && minutes < 24 * 60 && <Stat label="משך" value={`${minutes} דק׳`} />}
+          <Stat label="משך" value={minutes !== null && minutes >= 0 && minutes < 24 * 60 ? `${minutes} דק׳` : '—'} />
         </div>
         {workout.note && <p className="note-text">{workout.note}</p>}
       </section>
@@ -52,9 +56,11 @@ export function WorkoutDetail({ workoutId }: { workoutId: string }) {
         />
       ))}
 
-      <button type="button" className="btn btn--ghost btn--danger" onClick={remove}>
-        מחק אימון
-      </button>
+      <div className="finish-bar">
+        <button type="button" className="btn btn--ghost btn--danger" onClick={remove}>
+          מחק אימון
+        </button>
+      </div>
     </div>
   );
 }
@@ -76,13 +82,15 @@ function EntrySummary({ entry, onOpen }: { entry: WorkoutExercise; onOpen: () =>
 
   return (
     <section className="card">
-      <button type="button" className="card-head-btn" onClick={onOpen}>
-        <ExerciseTitle exercise={exercise} />
-        <span className="small" style={{ color: 'var(--primary)', fontWeight: 600 }}>
-          התקדמות ←
-        </span>
-      </button>
-      <ExerciseTags exercise={exercise} />
+      <div className="entry__head">
+        <div className="stack" style={{ gap: 6 }}>
+          <ExerciseTitle exercise={exercise} />
+          <ExerciseTags exercise={exercise} />
+        </div>
+        <button type="button" className="icon-btn icon-btn--panel" aria-label={`התקדמות ב${exercise.nameHe}`} onClick={onOpen}>
+          <Icon name="chart" />
+        </button>
+      </div>
       <table className="table">
         <thead>
           <tr>
@@ -106,9 +114,10 @@ function EntrySummary({ entry, onOpen }: { entry: WorkoutExercise; onOpen: () =>
           ))}
         </tbody>
       </table>
-      <p className="small muted">
-        נפח: {formatTotal(totalVolume(entry.sets))} ק"ג{best && ' · ★ הסט הטוב ביותר'}
-      </p>
+      <div className="kv">
+        <span>נפח{best && ' · ★ הסט הטוב ביותר'}</span>
+        <span>{formatTotal(totalVolume(entry.sets))} ק"ג</span>
+      </div>
       {entry.note && <p className="note-text">{entry.note}</p>}
     </section>
   );

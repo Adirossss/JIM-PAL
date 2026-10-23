@@ -1,6 +1,7 @@
 import { tabOf, type Route, type Tab } from './lib/route';
 import { AppProvider, useApp, type InitialState } from './state/AppContext';
 import { useUpdateCheck } from './state/useUpdateCheck';
+import { Icon, type IconName } from './components/common';
 import { DataScreen } from './components/DataScreen';
 import { ExerciseDetail } from './components/ExerciseDetail';
 import { ExercisesScreen, NewExerciseScreen } from './components/ExercisesScreen';
@@ -20,11 +21,6 @@ function Shell() {
   const { route } = useApp();
   return (
     <div className="app">
-      <header className="topbar">
-        <h1 className="brand">
-          Jim-Pal <span className="brand__sub">יומן אימונים</span>
-        </h1>
-      </header>
       <Notices />
       <main className="content">
         <Screen route={route} />
@@ -58,7 +54,7 @@ function UpdateBanner() {
   if (!update) return null;
   return (
     <div className="update-banner" role="status">
-      <span>🎉 יש גרסה חדשה של האפליקציה</span>
+      <span>יש גרסה חדשה של האפליקציה</span>
       <button type="button" className="btn btn--primary btn--small" onClick={apply}>
         עדכן עכשיו
       </button>
@@ -91,32 +87,41 @@ function Notices() {
   );
 }
 
-const TABS: Array<{ tab: Tab; label: string; route: Route; icon: string }> = [
-  { tab: 'workout', label: 'אימון', route: { name: 'workout' }, icon: 'M6 9v6M18 9v6M3 11v2M21 11v2M6 12h12' },
-  { tab: 'history', label: 'היסטוריה', route: { name: 'history' }, icon: 'M12 7v5l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0' },
-  { tab: 'exercises', label: 'תרגילים', route: { name: 'exercises' }, icon: 'M4 6h16M4 12h16M4 18h10' },
-  { tab: 'data', label: 'גיבוי', route: { name: 'data' }, icon: 'M12 4v11m0 0-4-4m4 4 4-4M5 20h14' },
+const TABS: Array<{ tab: Tab; label: string; route: Route; icon: IconName }> = [
+  { tab: 'workout', label: 'אימון', route: { name: 'workout' }, icon: 'dumbbell' },
+  { tab: 'history', label: 'היסטוריה', route: { name: 'history' }, icon: 'history' },
+  { tab: 'exercises', label: 'תרגילים', route: { name: 'exercises' }, icon: 'list' },
+  { tab: 'data', label: 'גיבוי', route: { name: 'data' }, icon: 'backup' },
 ];
 
+/** Floating pill: the active tab shows a dot and its label, the others their icon. */
 function TabBar({ active }: { active: Tab }) {
   const { navigate, data } = useApp();
   return (
     <nav className="tabbar" aria-label="ניווט ראשי">
-      {TABS.map((t) => (
-        <button
-          key={t.tab}
-          type="button"
-          className={`tabbar__item ${active === t.tab ? 'tabbar__item--active' : ''}`}
-          aria-current={active === t.tab ? 'page' : undefined}
-          onClick={() => navigate(t.route)}
-        >
-          <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
-            <path d={t.icon} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-          <span>{t.label}</span>
-          {t.tab === 'workout' && data.activeWorkout && <span className="tabbar__dot" aria-label="אימון פעיל" />}
-        </button>
-      ))}
+      {TABS.map((t) => {
+        const isActive = active === t.tab;
+        return (
+          <button
+            key={t.tab}
+            type="button"
+            className={`tabbar__item ${isActive ? 'tabbar__item--active' : ''}`}
+            aria-current={isActive ? 'page' : undefined}
+            aria-label={isActive ? undefined : t.label}
+            onClick={() => navigate(t.route)}
+          >
+            {isActive ? (
+              <>
+                <span className="tabbar__dot" aria-hidden="true" />
+                <span>{t.label}</span>
+              </>
+            ) : (
+              <Icon name={t.icon} size={24} />
+            )}
+            {t.tab === 'workout' && data.activeWorkout && <span className="tabbar__live" aria-label="אימון פעיל" />}
+          </button>
+        );
+      })}
     </nav>
   );
 }

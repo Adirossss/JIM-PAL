@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { formatKg } from '../lib/format';
 import { useApp } from '../state/AppContext';
 import { EQUIPMENT_LABELS_HE, MUSCLE_LABELS_HE, type EquipmentType, type Exercise, type SetEntry } from '../types';
@@ -21,7 +21,70 @@ export function useExercise(id: string): { exercise: Exercise; known: boolean } 
   return exercise ? { exercise, known: true } : { exercise: unknownExercise(id), known: false };
 }
 
-export function ExerciseTitle({ exercise, as: Tag = 'h3' }: { exercise: Exercise; as?: 'h2' | 'h3' | 'span' }) {
+const ICON_PATHS = {
+  back: 'M5 12h14M13 6l6 6-6 6',
+  go: 'M15 6l-6 6 6 6',
+  dumbbell: 'M6 9v6M18 9v6M3 11v2M21 11v2M6 12h12',
+  history: 'M12 7v5l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0',
+  list: 'M4 6h16M4 12h16M4 18h10',
+  backup: 'M12 4v11m0 0-4-4m4 4 4-4M5 20h14',
+  chart: 'M4 19h16M6 15l4-4 3 3 5-6',
+  note: 'M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4',
+  calendar: 'M8 3v4M16 3v4M4 10h16M7 5h10a3 3 0 0 1 3 3v9a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V8a3 3 0 0 1 3-3z',
+  search: 'M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-4-4',
+  close: 'M6 6l12 12M18 6L6 18',
+  up: 'M12 19V5M6 11l6-6 6 6',
+  down: 'M12 5v14M6 13l6 6 6-6',
+  trash: 'M5 7h14M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3',
+  copy: 'M9 9h10v10H9zM5 15V5h10',
+  plus: 'M12 5v14M5 12h14',
+  check: 'M5 12l5 5 9-10',
+} as const;
+
+export type IconName = keyof typeof ICON_PATHS;
+
+/** Inline stroke icon; decorative, so hidden from screen readers (label the button instead). */
+export function Icon({ name, size = 20 }: { name: IconName; size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
+      <path d={ICON_PATHS[name]} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/** Header row: start slot, centered title (with optional subtitle), end slot. */
+export function ScreenHeader({
+  start,
+  title,
+  subtitle,
+  end,
+}: {
+  start?: ReactNode;
+  title: ReactNode;
+  subtitle?: ReactNode;
+  end?: ReactNode;
+}) {
+  return (
+    <header className="screen-header">
+      <div className="screen-header__slot screen-header__slot--wide">{start}</div>
+      <div className="screen-header__title">
+        <strong>{title}</strong>
+        {subtitle && <span>{subtitle}</span>}
+      </div>
+      <div className="screen-header__slot screen-header__slot--wide">{end}</div>
+    </header>
+  );
+}
+
+export function BackButton({ onClick, label = 'חזרה' }: { onClick: () => void; label?: string }) {
+  return (
+    <button type="button" className="icon-btn" onClick={onClick} aria-label={label}>
+      <Icon name="back" />
+    </button>
+  );
+}
+
+export function ExerciseTitle({ exercise, as: Tag = 'h3' }: { exercise: Exercise; as?: 'h1' | 'h2' | 'h3' | 'span' }) {
   return (
     <Tag className="exercise-title">
       <span className="exercise-title__he">{exercise.nameHe}</span>
@@ -44,7 +107,7 @@ export function ExerciseTags({ exercise }: { exercise: Exercise }) {
   );
 }
 
-/** "82.5 ק"ג × 6", or for bodyweight "משקל גוף × 10" / "משקל גוף +10 ק"ג × 8". */
+/** "82.5 ק"ג × 6", or for bodyweight "משקל גוף × 10" / "משקל גוף +10 ק"ג × 6". */
 export function formatSet(set: SetEntry, equipment: EquipmentType): string {
   if (equipment === 'bodyweight') {
     const load = set.weight ? ` +${formatKg(set.weight)} ק"ג` : '';
@@ -58,8 +121,6 @@ export function SetText({ set, equipment }: { set: SetEntry; equipment: Equipmen
 }
 
 export function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
-  const dialogRef = useRef<HTMLDivElement>(null);
-
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -75,11 +136,11 @@ export function Modal({ title, onClose, children }: { title: string; onClose: ()
 
   return (
     <div className="modal-backdrop" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="modal" role="dialog" aria-modal="true" aria-label={title} ref={dialogRef}>
+      <div className="modal" role="dialog" aria-modal="true" aria-label={title}>
         <div className="modal__header">
           <h2>{title}</h2>
-          <button type="button" className="btn btn--ghost btn--icon" onClick={onClose} aria-label="סגור">
-            ✕
+          <button type="button" className="icon-btn" onClick={onClose} aria-label="סגור">
+            <Icon name="close" />
           </button>
         </div>
         <div className="modal__body">{children}</div>
@@ -94,13 +155,5 @@ export function EmptyState({ title, children }: { title: string; children?: Reac
       <p className="empty__title">{title}</p>
       {children}
     </div>
-  );
-}
-
-export function BackButton({ onClick, label = 'חזרה' }: { onClick: () => void; label?: string }) {
-  return (
-    <button type="button" className="btn btn--ghost back-btn" onClick={onClick}>
-      → {label}
-    </button>
   );
 }

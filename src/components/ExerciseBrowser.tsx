@@ -10,7 +10,7 @@ import {
   type Exercise,
   type MuscleGroup,
 } from '../types';
-import { ExerciseTags } from './common';
+import { ExerciseTags, Icon } from './common';
 
 interface Props {
   onSelect: (exercise: Exercise) => void;
@@ -34,18 +34,21 @@ export function ExerciseBrowser({ onSelect, autoFocus = false, markedIds }: Prop
   return (
     <div className="browser">
       <div className="browser__filters">
-        <input
-          type="search"
-          className="input"
-          placeholder="חיפוש בעברית או באנגלית…"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          autoFocus={autoFocus}
-          aria-label="חיפוש תרגיל"
-        />
+        <div className="search">
+          <Icon name="search" size={18} />
+          <input
+            type="search"
+            className="input input--surface"
+            placeholder="חיפוש בעברית או באנגלית…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            autoFocus={autoFocus}
+            aria-label="חיפוש תרגיל"
+          />
+        </div>
         <div className="row">
           <select
-            className="input"
+            className="input input--surface"
             value={muscle}
             onChange={(e) => setMuscle(e.target.value as MuscleGroup | '')}
             aria-label="סינון לפי קבוצת שריר"
@@ -58,7 +61,7 @@ export function ExerciseBrowser({ onSelect, autoFocus = false, markedIds }: Prop
             ))}
           </select>
           <select
-            className="input"
+            className="input input--surface"
             value={equipment}
             onChange={(e) => setEquipment(e.target.value as EquipmentType | '')}
             aria-label="סינון לפי ציוד"

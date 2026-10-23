@@ -1,5 +1,5 @@
-import { useState, type FormEvent } from 'react';
-import { formatDateHe } from '../lib/format';
+import { useId, useState, type FormEvent } from 'react';
+import { formatDateHe, formatKg } from '../lib/format';
 import { exerciseSessions } from '../lib/stats';
 import {
   addSet,
@@ -10,126 +10,192 @@ import {
   removeExercise,
   setExerciseNote,
   setToInputText,
+  stepReps,
+  stepWeight,
   updateSet,
   validateSetInput,
 } from '../lib/workout';
 import { useApp } from '../state/AppContext';
 import type { EquipmentType, SetEntry, Workout, WorkoutExercise } from '../types';
-import { ExerciseTags, ExerciseTitle, SetText, formatSet, useExercise } from './common';
+import { ExerciseTags, ExerciseTitle, Icon, formatSet, useExercise } from './common';
+
+const WEIGHT_STEP_KG = 2.5;
 
 interface Props {
   workout: Workout;
   entry: WorkoutExercise;
   index: number;
+  onRemoved: () => void;
 }
 
-export function ExerciseEntryCard({ workout, entry, index }: Props) {
+export function ExerciseEntryCard({ workout, entry, index, onRemoved }: Props) {
   const { data, updateActive, navigate } = useApp();
   const { exercise } = useExercise(entry.exerciseId);
   const history = data.workouts;
+  const formId = useId();
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [showNote, setShowNote] = useState(entry.note !== '');
 
   const previous = exerciseSessions(history, entry.exerciseId)[0];
   const canDuplicate = entry.sets.length > 0 || lastLoggedSet(entry.exerciseId, null, history) !== null;
+  const editing = entry.sets.find((s) => s.id === editingId) ?? null;
 
   const remove = () => {
     if (entry.sets.length > 0 && !window.confirm(`להסיר את "${exercise.nameHe}" ואת ${entry.sets.length} הסטים שלו?`)) {
       return;
     }
     updateActive((w) => removeExercise(w, entry.id));
+    onRemoved();
   };
 
   return (
-    <section className="card entry">
-      <header className="entry__header">
-        <span className="entry__index">{index + 1}</span>
-        <div className="entry__title">
-          <ExerciseTitle exercise={exercise} />
+    <section className="card entry" aria-label={exercise.nameHe}>
+      <div className="entry__head">
+        <div className="stack" style={{ gap: 6 }}>
+          <ExerciseTitle exercise={exercise} as="h2" />
           <ExerciseTags exercise={exercise} />
         </div>
-        <div className="entry__tools">
-          <button
-            type="button"
-            className="btn btn--ghost btn--icon"
-            onClick={() => updateActive((w) => moveExercise(w, entry.id, -1))}
-            disabled={index === 0}
-            aria-label="הזז למעלה"
-          >
-            ↑
-          </button>
-          <button
-            type="button"
-            className="btn btn--ghost btn--icon"
-            onClick={() => updateActive((w) => moveExercise(w, entry.id, 1))}
-            disabled={index === workout.exercises.length - 1}
-            aria-label="הזז למטה"
-          >
-            ↓
-          </button>
-          <button type="button" className="btn btn--ghost btn--icon btn--danger" onClick={remove} aria-label="הסר תרגיל">
-            ✕
-          </button>
-        </div>
-      </header>
-
-      {previous && (
-        <p className="entry__previous muted">
-          בפעם הקודמת ({formatDateHe(previous.date)}):{' '}
-          {previous.sets.map((s) => formatSet(s, exercise.equipment)).join(' · ')}
-        </p>
-      )}
-
-      {entry.sets.length > 0 && (
-        <ol className="sets">
-          {entry.sets.map((s, i) => (
-            <SetRow key={s.id} set={s} number={i + 1} entryId={entry.id} equipment={exercise.equipment} />
-          ))}
-        </ol>
-      )}
-
-      <NewSetForm
-        entryId={entry.id}
-        equipment={exercise.equipment}
-        initial={setToInputText(lastLoggedSet(entry.exerciseId, workout, history))}
-      />
-
-      <div className="entry__actions">
         <button
           type="button"
-          className="btn btn--secondary"
-          onClick={() => updateActive((w) => duplicateLastSet(w, entry.id, history))}
-          disabled={!canDuplicate}
-        >
-          ⧉ שכפל סט אחרון
-        </button>
-        {!showNote && (
-          <button type="button" className="btn btn--ghost" onClick={() => setShowNote(true)}>
-            + הערה
-          </button>
-        )}
-        <button
-          type="button"
-          className="btn btn--ghost"
+          className="icon-btn icon-btn--panel"
+          aria-label="התקדמות בתרגיל"
           onClick={() => navigate({ name: 'exerciseDetail', exerciseId: entry.exerciseId })}
         >
-          התקדמות
+          <Icon name="chart" />
         </button>
       </div>
 
-      {showNote && (
-        <textarea
-          className="input note"
-          placeholder="הערה לתרגיל…"
-          value={entry.note}
-          onChange={(e) => updateActive((w) => setExerciseNote(w, entry.id, e.target.value))}
-          rows={2}
+      {previous && (
+        <p className="entry__previous">
+          בפעם הקודמת ({formatDateHe(previous.date)}):{' '}
+          {previous.sets.map((s, i) => (
+            <span key={s.id} style={{ whiteSpace: 'nowrap' }}>
+              {i > 0 && ' · '}
+              <bdi>{formatSet(s, exercise.equipment)}</bdi>
+            </span>
+          ))}
+        </p>
+      )}
+
+      <div className="stack" style={{ gap: 8 }}>
+        <span className="entry__label">סטים</span>
+        <div className="set-circles">
+          {entry.sets.map((s, i) => (
+            <button
+              key={s.id}
+              type="button"
+              className={`set-circle ${s.id === editingId ? 'set-circle--on' : ''}`}
+              aria-pressed={s.id === editingId}
+              aria-label={`סט ${i + 1}: ${formatSet(s, exercise.equipment)}. לחץ לעריכה`}
+              onClick={() => setEditingId(s.id === editingId ? null : s.id)}
+            >
+              <b dir="ltr">{circleWeight(s, exercise.equipment)}</b>
+              <span>× {s.reps}</span>
+            </button>
+          ))}
+          {!editing && (
+            <button type="submit" form={formId} className="set-circle set-circle--add" aria-label="הוסף סט">
+              +
+            </button>
+          )}
+        </div>
+      </div>
+
+      {editing ? (
+        <EditSetPanel
+          key={editing.id}
+          set={editing}
+          number={entry.sets.indexOf(editing) + 1}
+          equipment={exercise.equipment}
+          onSave={(values) => {
+            updateActive((w) => updateSet(w, entry.id, editing.id, values));
+            setEditingId(null);
+          }}
+          onDelete={() => {
+            if (!window.confirm(`למחוק את סט ${entry.sets.indexOf(editing) + 1}?`)) return;
+            updateActive((w) => deleteSet(w, entry.id, editing.id));
+            setEditingId(null);
+          }}
+          onCancel={() => setEditingId(null)}
         />
+      ) : (
+        <NewSetForm
+          id={formId}
+          entryId={entry.id}
+          equipment={exercise.equipment}
+          initial={setToInputText(lastLoggedSet(entry.exerciseId, workout, history))}
+        />
+      )}
+
+      {showNote && (
+        <label className="field">
+          <span className="field__label">הערה לתרגיל</span>
+          <textarea
+            className="input"
+            placeholder="אחיזה, תחושה, מה לשנות בפעם הבאה…"
+            value={entry.note}
+            onChange={(e) => updateActive((w) => setExerciseNote(w, entry.id, e.target.value))}
+            rows={2}
+          />
+        </label>
+      )}
+
+      <div className="entry__tools">
+        {!showNote && (
+          <button type="button" className="btn btn--ghost btn--small" onClick={() => setShowNote(true)}>
+            + הערה
+          </button>
+        )}
+        <span style={{ flex: 1 }} />
+        <button
+          type="button"
+          className="icon-btn icon-btn--panel"
+          onClick={() => updateActive((w) => moveExercise(w, entry.id, -1))}
+          disabled={index <= 0}
+          aria-label="הזז את התרגיל קודם"
+        >
+          <Icon name="up" size={18} />
+        </button>
+        <button
+          type="button"
+          className="icon-btn icon-btn--panel"
+          onClick={() => updateActive((w) => moveExercise(w, entry.id, 1))}
+          disabled={index >= workout.exercises.length - 1}
+          aria-label="הזז את התרגיל אחר כך"
+        >
+          <Icon name="down" size={18} />
+        </button>
+        <button type="button" className="icon-btn icon-btn--panel icon-btn--danger" onClick={remove} aria-label="הסר תרגיל">
+          <Icon name="trash" size={18} />
+        </button>
+      </div>
+
+      {!editing && (
+        <div className="entry__actions">
+          <button
+            type="button"
+            className="btn btn--secondary btn--large"
+            onClick={() => updateActive((w) => duplicateLastSet(w, entry.id, history))}
+            disabled={!canDuplicate}
+          >
+            שכפל סט אחרון
+          </button>
+          <button type="submit" form={formId} className="btn btn--primary btn--large">
+            הוסף סט
+          </button>
+        </div>
       )}
     </section>
   );
 }
 
-function SetInputs({
+/** Weight as shown inside a set circle: "82.5", "+10" (added load) or "גוף" (bodyweight only). */
+function circleWeight(set: SetEntry, equipment: EquipmentType): string {
+  if (equipment === 'bodyweight') return set.weight ? `+${formatKg(set.weight)}` : 'גוף';
+  return formatKg(set.weight ?? 0);
+}
+
+function SetSteppers({
   weight,
   reps,
   onWeight,
@@ -143,41 +209,62 @@ function SetInputs({
   equipment: EquipmentType;
 }) {
   const bodyweight = equipment === 'bodyweight';
+  const weightLabel = bodyweight ? 'תוספת משקל' : 'משקל';
   return (
-    <>
-      <label className="set-input">
-        <span className="set-input__label">{bodyweight ? 'תוספת (ק"ג)' : 'משקל (ק"ג)'}</span>
-        <input
-          className="input input--num"
-          inputMode="decimal"
-          enterKeyHint="next"
-          placeholder={bodyweight ? 'ללא' : '0'}
-          value={weight}
-          onChange={(e) => onWeight(e.target.value)}
-          onFocus={(e) => e.target.select()}
-        />
-      </label>
-      <label className="set-input">
-        <span className="set-input__label">חזרות</span>
-        <input
-          className="input input--num"
-          inputMode="numeric"
-          enterKeyHint="done"
-          placeholder="0"
-          value={reps}
-          onChange={(e) => onReps(e.target.value)}
-          onFocus={(e) => e.target.select()}
-        />
-      </label>
-    </>
+    <div className="stack" style={{ gap: 10 }}>
+      <div className="stepper-row">
+        <span className="stepper-row__label">
+          {bodyweight ? 'תוספת' : 'משקל'} <span className="muted">(ק"ג)</span>
+        </span>
+        <div className="stepper">
+          <button type="button" aria-label={`פחות ${weightLabel}`} onClick={() => onWeight(stepWeight(weight, -WEIGHT_STEP_KG, equipment))}>
+            −
+          </button>
+          <input
+            inputMode="decimal"
+            enterKeyHint="done"
+            aria-label={`${weightLabel} בק"ג`}
+            placeholder={bodyweight ? 'ללא' : '0'}
+            value={weight}
+            onChange={(e) => onWeight(e.target.value)}
+            onFocus={(e) => e.target.select()}
+          />
+          <button type="button" aria-label={`יותר ${weightLabel}`} onClick={() => onWeight(stepWeight(weight, WEIGHT_STEP_KG, equipment))}>
+            +
+          </button>
+        </div>
+      </div>
+      <div className="stepper-row">
+        <span className="stepper-row__label">חזרות</span>
+        <div className="stepper">
+          <button type="button" aria-label="פחות חזרות" onClick={() => onReps(stepReps(reps, -1))}>
+            −
+          </button>
+          <input
+            inputMode="numeric"
+            enterKeyHint="done"
+            aria-label="חזרות"
+            placeholder="0"
+            value={reps}
+            onChange={(e) => onReps(e.target.value)}
+            onFocus={(e) => e.target.select()}
+          />
+          <button type="button" aria-label="יותר חזרות" onClick={() => onReps(stepReps(reps, 1))}>
+            +
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
 function NewSetForm({
+  id,
   entryId,
   equipment,
   initial,
 }: {
+  id: string;
   entryId: string;
   equipment: EquipmentType;
   initial: { weight: string; reps: string };
@@ -201,11 +288,8 @@ function NewSetForm({
   };
 
   return (
-    <form className="set-form" onSubmit={submit} noValidate>
-      <SetInputs weight={weight} reps={reps} onWeight={setWeight} onReps={setReps} equipment={equipment} />
-      <button type="submit" className="btn btn--primary set-form__submit">
-        + הוסף סט
-      </button>
+    <form id={id} className="panel" onSubmit={submit} noValidate aria-label="סט חדש">
+      <SetSteppers weight={weight} reps={reps} onWeight={setWeight} onReps={setReps} equipment={equipment} />
       {error && (
         <p className="error" role="alert">
           {error}
@@ -215,30 +299,25 @@ function NewSetForm({
   );
 }
 
-function SetRow({
+function EditSetPanel({
   set,
   number,
-  entryId,
   equipment,
+  onSave,
+  onDelete,
+  onCancel,
 }: {
   set: SetEntry;
   number: number;
-  entryId: string;
   equipment: EquipmentType;
+  onSave: (values: { weight: number | null; reps: number }) => void;
+  onDelete: () => void;
+  onCancel: () => void;
 }) {
-  const { updateActive } = useApp();
-  const [editing, setEditing] = useState(false);
-  const [weight, setWeight] = useState('');
-  const [reps, setReps] = useState('');
+  const text = setToInputText(set);
+  const [weight, setWeight] = useState(text.weight);
+  const [reps, setReps] = useState(text.reps);
   const [error, setError] = useState<string | null>(null);
-
-  const startEdit = () => {
-    const text = setToInputText(set);
-    setWeight(text.weight);
-    setReps(text.reps);
-    setError(null);
-    setEditing(true);
-  };
 
   const save = (e: FormEvent) => {
     e.preventDefault();
@@ -247,50 +326,29 @@ function SetRow({
       setError(result.error);
       return;
     }
-    updateActive((w) => updateSet(w, entryId, set.id, result.values));
-    setEditing(false);
+    onSave(result.values);
   };
-
-  const remove = () => {
-    if (window.confirm(`למחוק את סט ${number}?`)) updateActive((w) => deleteSet(w, entryId, set.id));
-  };
-
-  if (editing) {
-    return (
-      <li className="set set--editing">
-        <form className="set-form" onSubmit={save} noValidate>
-          <span className="set__number">{number}</span>
-          <SetInputs weight={weight} reps={reps} onWeight={setWeight} onReps={setReps} equipment={equipment} />
-          <div className="row">
-            <button type="submit" className="btn btn--primary">
-              שמור
-            </button>
-            <button type="button" className="btn btn--ghost" onClick={() => setEditing(false)}>
-              ביטול
-            </button>
-          </div>
-          {error && (
-            <p className="error" role="alert">
-              {error}
-            </p>
-          )}
-        </form>
-      </li>
-    );
-  }
 
   return (
-    <li className="set">
-      <span className="set__number">{number}</span>
-      <SetText set={set} equipment={equipment} />
-      <span className="set__tools">
-        <button type="button" className="btn btn--ghost btn--small" onClick={startEdit}>
-          ערוך
+    <form className="edit-panel" onSubmit={save} noValidate aria-label={`עריכת סט ${number}`}>
+      <span className="entry__label">עריכת סט {number}</span>
+      <SetSteppers weight={weight} reps={reps} onWeight={setWeight} onReps={setReps} equipment={equipment} />
+      {error && (
+        <p className="error" role="alert">
+          {error}
+        </p>
+      )}
+      <div className="edit-panel__actions">
+        <button type="submit" className="btn btn--primary">
+          שמור
         </button>
-        <button type="button" className="btn btn--ghost btn--small btn--danger" onClick={remove}>
-          מחק
+        <button type="button" className="btn btn--secondary" onClick={onCancel}>
+          ביטול
         </button>
-      </span>
-    </li>
+        <button type="button" className="btn btn--ghost btn--danger" onClick={onDelete}>
+          מחק סט
+        </button>
+      </div>
+    </form>
   );
 }

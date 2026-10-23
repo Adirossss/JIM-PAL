@@ -1,6 +1,7 @@
 import { useRef, useState, type ChangeEvent } from 'react';
 import { exportFileName, parseImport, serializeExport } from '../lib/schema';
 import { useApp } from '../state/AppContext';
+import { ScreenHeader } from './common';
 import { Stat } from './WorkoutDetail';
 
 const MAX_IMPORT_BYTES = 20 * 1024 * 1024;
@@ -65,6 +66,7 @@ export function DataScreen() {
 
   return (
     <div className="stack">
+      <ScreenHeader title="גיבוי ונתונים" />
       <section className="card">
         <h2>הנתונים שלך</h2>
         <div className="stat-grid">

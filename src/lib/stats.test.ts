@@ -2,7 +2,12 @@ import { describe, expect, it } from 'vitest';
 import type { SetEntry, Workout, WorkoutExercise } from '../types';
 import {
   bestSet,
+  countWorkoutsThisWeek,
   estimateOneRepMax,
+  percentChange,
+  recentHighlights,
+  recentVolumes,
+  startOfWeek,
   exerciseSessions,
   exerciseStats,
   groupWorkoutsByMonth,
@@ -88,6 +93,14 @@ describe('date ordering and grouping', () => {
     expect(input.map((w) => w.id)).toEqual(['w1', 'w3a', 'w4', 'w2', 'w3b']);
   });
 
+  it('finds the Sunday that starts the week and counts this week\'s workouts', () => {
+    expect(startOfWeek('2026-10-24')).toBe('2026-10-18'); // Saturday → Sunday before
+    expect(startOfWeek('2026-10-18')).toBe('2026-10-18'); // Sunday itself
+    expect(startOfWeek('2026-11-03')).toBe('2026-11-01'); // across a month
+    expect(countWorkoutsThisWeek([w1, w2, w3a, w3b, w4], '2026-10-22')).toBe(2);
+    expect(countWorkoutsThisWeek([w1, w2], '2026-10-22')).toBe(0);
+  });
+
   it('groups by month with Hebrew labels, newest first', () => {
     const groups = groupWorkoutsByMonth([w1, w3a, w4, w2, w3b]);
     expect(groups.map((g) => [g.key, g.label, g.workouts.map((w) => w.id)])).toEqual([
@@ -154,6 +167,18 @@ describe('per-exercise history', () => {
     const bw = [workout('a', '2026-10-01', [entry('pull-up', [set(null, 10)])]),
       workout('b', '2026-10-08', [entry('pull-up', [set(10, 5)])])];
     expect(oneRepMaxProgress(bw, 'pull-up').map((p) => p.date)).toEqual(['2026-10-08']);
+  });
+
+  it('builds the volume bars, change and highlights for the home screen', () => {
+    expect(recentVolumes(history, 3).map((v) => [v.workoutId, v.volume])).toEqual([
+      ['mid', 425], ['new', 970], ['none', 330],
+    ]);
+    expect(recentVolumes([], 6)).toEqual([]);
+    expect(percentChange(970, 330)).toBe(-66);
+    expect(percentChange(400, 500)).toBe(25);
+    expect(percentChange(0, 500)).toBeNull();
+    expect(recentHighlights(history, 2).map((h) => h.exerciseId)).toEqual(['squat', 'bench']);
+    expect(recentHighlights(history, 1)[0]?.bestOneRepMax).toBeCloseTo(110 * 1.1);
   });
 
   it('summarizes a workout and lists recently used exercises', () => {

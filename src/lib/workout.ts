@@ -150,6 +150,25 @@ export function validateSetInput(weightText: string, repsText: string, equipment
   return { ok: true, values: { weight: normalizedWeight, reps } };
 }
 
+/**
+ * The weight stepper's − / + : moves the typed weight by `delta` kg, never
+ * below 0. On a bodyweight exercise 0 means "no added load" and shows empty.
+ */
+export function stepWeight(text: string, delta: number, equipment: EquipmentType): string {
+  const current = parseWeight(text);
+  const base = current === null || Number.isNaN(current) ? 0 : current;
+  const next = Math.min(MAX_WEIGHT_KG, Math.max(0, Math.round((base + delta) * 100) / 100));
+  if (equipment === 'bodyweight' && next === 0) return '';
+  return String(next);
+}
+
+/** The reps stepper's − / + : moves the typed reps by `delta`, kept between 1 and MAX_REPS. */
+export function stepReps(text: string, delta: number): string {
+  const current = parseReps(text);
+  const base = Number.isNaN(current) ? 0 : current;
+  return String(Math.min(MAX_REPS, Math.max(1, base + delta)));
+}
+
 /** Text to pre-fill the set form with, from a previous set. */
 export function setToInputText(set: SetEntry | null): { weight: string; reps: string } {
   if (!set) return { weight: '', reps: '' };

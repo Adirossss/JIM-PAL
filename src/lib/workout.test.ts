@@ -14,6 +14,8 @@ import {
   setWorkoutDate,
   setWorkoutNote,
   startWorkout,
+  stepReps,
+  stepWeight,
   updateSet,
   validateSetInput,
 } from './workout';
@@ -158,6 +160,31 @@ describe('validateSetInput', () => {
     expect(validateSetInput('50', '0', 'cable').ok).toBe(false);
     expect(validateSetInput('50', '7.5', 'cable').ok).toBe(false);
     expect(validateSetInput('50', '', 'cable').ok).toBe(false);
+  });
+});
+
+describe('steppers', () => {
+  it('moves the weight by the step, never below zero', () => {
+    expect(stepWeight('80', 2.5, 'free_weight')).toBe('82.5');
+    expect(stepWeight('82,5', -2.5, 'machine')).toBe('80');
+    expect(stepWeight('', 2.5, 'cable')).toBe('2.5');
+    expect(stepWeight('1', -2.5, 'machine')).toBe('0');
+    expect(stepWeight('abc', 2.5, 'machine')).toBe('2.5');
+    expect(stepWeight('999', 2.5, 'machine')).toBe('1000');
+  });
+
+  it('shows no added load as empty on bodyweight exercises', () => {
+    expect(stepWeight('2.5', -2.5, 'bodyweight')).toBe('');
+    expect(stepWeight('', -2.5, 'bodyweight')).toBe('');
+    expect(stepWeight('', 2.5, 'bodyweight')).toBe('2.5');
+  });
+
+  it('moves reps by one, between 1 and the maximum', () => {
+    expect(stepReps('8', 1)).toBe('9');
+    expect(stepReps('8', -1)).toBe('7');
+    expect(stepReps('1', -1)).toBe('1');
+    expect(stepReps('', 1)).toBe('1');
+    expect(stepReps('1000', 1)).toBe('1000');
   });
 });
 

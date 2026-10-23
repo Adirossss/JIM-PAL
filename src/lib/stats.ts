@@ -187,6 +187,57 @@ export function oneRepMaxProgress(workouts: readonly Workout[], exerciseId: stri
   return [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date));
 }
 
+/** Sunday that starts the week of a YYYY-MM-DD date (weeks start on Sunday in Israel). */
+export function startOfWeek(date: string): string {
+  const [y, m, d] = date.split('-').map(Number);
+  const utc = new Date(Date.UTC(y ?? 1970, (m ?? 1) - 1, d ?? 1));
+  utc.setUTCDate(utc.getUTCDate() - utc.getUTCDay());
+  return utc.toISOString().slice(0, 10);
+}
+
+/** Finished workouts dated in the same week as `today`. */
+export function countWorkoutsThisWeek(workouts: readonly Workout[], today: string): number {
+  const from = startOfWeek(today);
+  return workouts.filter((w) => w.date >= from && w.date <= today).length;
+}
+
+export interface VolumePoint {
+  workoutId: string;
+  date: string;
+  volume: number;
+}
+
+/** Total volume of the last `count` workouts, oldest first. */
+export function recentVolumes(workouts: readonly Workout[], count: number): VolumePoint[] {
+  return sortWorkoutsNewestFirst(workouts)
+    .slice(0, count)
+    .reverse()
+    .map((w) => ({ workoutId: w.id, date: w.date, volume: summarizeWorkout(w).volume }));
+}
+
+/** Percent change from `previous` to `current`, rounded; null when there is no base to compare. */
+export function percentChange(previous: number, current: number): number | null {
+  if (!(previous > 0)) return null;
+  return Math.round(((current - previous) / previous) * 100);
+}
+
+export interface ExerciseHighlight {
+  exerciseId: string;
+  bestOneRepMax: number;
+}
+
+/** Best estimated 1RM of the most recently used loaded exercises, most recent first. */
+export function recentHighlights(workouts: readonly Workout[], count: number): ExerciseHighlight[] {
+  const result: ExerciseHighlight[] = [];
+  for (const exerciseId of recentlyUsedExerciseIds(workouts)) {
+    const best = exerciseStats(workouts, exerciseId).bestSet;
+    const oneRepMax = best ? setOneRepMax(best) : 0;
+    if (oneRepMax > 0) result.push({ exerciseId, bestOneRepMax: oneRepMax });
+    if (result.length === count) break;
+  }
+  return result;
+}
+
 /** Ids of exercises that appear in at least one workout, most recently used first. */
 export function recentlyUsedExerciseIds(workouts: readonly Workout[]): string[] {
   const seen = new Set<string>();

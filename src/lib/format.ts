@@ -24,7 +24,19 @@ export function formatDateHe(value: string): string {
   return `${Number(m[3])}.${Number(m[2])}.${m[1]}`;
 }
 
-const HEBREW_WEEKDAYS = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
+/** "היום", "אתמול", otherwise the date as 24.10.2026. */
+export function relativeDayHe(value: string, today: string): string {
+  const toDay = (s: string) => {
+    const [y, m, d] = s.split('-').map(Number);
+    return Date.UTC(y ?? 1970, (m ?? 1) - 1, d ?? 1) / 86_400_000;
+  };
+  const diff = toDay(today) - toDay(value);
+  if (diff === 0) return 'היום';
+  if (diff === 1) return 'אתמול';
+  return formatDateHe(value);
+}
+
+const HEBREW_WEEKDAYS =['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
 
 /** "2026-10-22" → "יום חמישי" */
 export function weekdayHe(value: string): string {
