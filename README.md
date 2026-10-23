@@ -67,6 +67,8 @@ npm run preview    # serve the production build locally
   `favoriteExerciseIds` and `templates`; version 1 data (stored or imported) is
   upgraded automatically by the migrations in `src/lib/schema.ts`.
 - `src/lib/storage.ts` is the only module that touches `localStorage`.
+- The light/dark choice (גיבוי → מראה: בהיר / כהה / לפי הטלפון, light by default) is a
+  per-device setting under its own key, `jim-pal:theme`; it is not part of the backup.
 - If stored data can't be read, it is copied to a backup key
   (`jim-pal:data:unreadable:<timestamp>`) instead of being overwritten, and the app
   starts empty with a warning.

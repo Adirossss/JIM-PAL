@@ -41,11 +41,41 @@
   --radius-card: 28px;
   --radius-inner: 22px;
   --tabbar-h: 68px;
+  --star: #a36b00;
+  --hero-btn: rgb(255 255 255 / 0.65);
   color-scheme: light;
 }
 
+/*
+ * Dark palette: picked in the app (data-theme="dark"), or following the phone
+ * (data-theme="system" + the OS setting). Light is the default.
+ */
+:root[data-theme='dark'] {
+  --bg: #0f1113;
+  --sheet: #15181b;
+  --surface: #1c1f23;
+  --panel: #24282c;
+  --chip: #2b3034;
+  --line: #353b40;
+  --hero: #22262a;
+  --text: #f1f3f4;
+  --muted: #a0a8af;
+  --primary: #f1f3f4;
+  --primary-text: #111315;
+  --accent: #4fa56b;
+  --accent-soft: #1d3325;
+  --danger: #ff8a80;
+  --danger-soft: #3a1d1d;
+  --warn-soft: #3a3115;
+  --shadow: 0 10px 30px rgb(0 0 0 / 0.45);
+  --chart-grid: #3a4046;
+  --star: #f0b429;
+  --hero-btn: var(--panel);
+  color-scheme: dark;
+}
+
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root[data-theme='system'] {
     --bg: #0f1113;
     --sheet: #15181b;
     --surface: #1c1f23;
@@ -64,6 +94,8 @@
     --warn-soft: #3a3115;
     --shadow: 0 10px 30px rgb(0 0 0 / 0.45);
     --chart-grid: #3a4046;
+    --star: #f0b429;
+    --hero-btn: var(--panel);
     color-scheme: dark;
   }
 }
@@ -471,13 +503,7 @@ button {
 }
 
 .icon-btn--star {
-  color: #a36b00;
-}
-
-@media (prefers-color-scheme: dark) {
-  .icon-btn--star {
-    color: #f0b429;
-  }
+  color: var(--star);
 }
 
 .link-btn {
@@ -554,6 +580,40 @@ button {
 .date-pill {
   flex: 1;
   min-width: 0;
+}
+
+/* ── Segmented control (one of a few) ───────────────────── */
+
+.segmented {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--panel);
+}
+
+.segmented__item {
+  flex: 1;
+  min-height: 44px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 150ms ease, color 150ms ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.segmented__item--on {
+  background: var(--primary);
+  color: var(--primary-text);
+}
+
+.segmented__item:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 /* ── Chips ──────────────────────────────────────────────── */
@@ -1416,13 +1476,7 @@ h2.exercise-title .exercise-title__he {
 }
 
 .progress-hero .icon-btn {
-  background: rgb(255 255 255 / 0.65);
-}
-
-@media (prefers-color-scheme: dark) {
-  .progress-hero .icon-btn {
-    background: var(--panel);
-  }
+  background: var(--hero-btn);
 }
 
 .progress-hero .sheet {

@@ -4,6 +4,7 @@
  */
 import type { AppData } from '../types';
 import { CURRENT_SCHEMA_VERSION, emptyAppData, migrateAppData } from './schema';
+import { DEFAULT_THEME, parseThemePreference, type ThemePreference } from './theme';
 
 export const STORAGE_KEY = 'jim-pal:data';
 export const CORRUPT_BACKUP_PREFIX = 'jim-pal:data:unreadable:';
@@ -81,6 +82,28 @@ export function subscribeToExternalChanges(
   };
   target.addEventListener('storage', handler);
   return () => target.removeEventListener('storage', handler);
+}
+
+/**
+ * The light/dark preference is a per-device display setting, kept under its
+ * own key: it is not workout data and is not exported.
+ */
+export const THEME_KEY = 'jim-pal:theme';
+
+export function loadThemePreference(store: KeyValueStore): ThemePreference {
+  try {
+    return parseThemePreference(store.getItem(THEME_KEY));
+  } catch {
+    return DEFAULT_THEME;
+  }
+}
+
+export function saveThemePreference(store: KeyValueStore, preference: ThemePreference): void {
+  try {
+    store.setItem(THEME_KEY, preference);
+  } catch {
+    // Storage full or blocked: the choice still applies until the app is closed.
+  }
 }
 
 /** window.localStorage, or null when unavailable (e.g. blocked by privacy settings). */

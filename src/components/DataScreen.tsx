@@ -2,12 +2,39 @@ import { useRef, useState, type ChangeEvent } from 'react';
 import { exportFileName, parseImport, serializeExport } from '../lib/schema';
 import { useApp } from '../state/AppContext';
 import { useConfirm } from '../state/confirm';
+import { useThemePreference } from '../state/theme';
+import { THEME_LABELS_HE, THEME_PREFERENCES } from '../lib/theme';
 import { ScreenHeader } from './common';
 import { Stat } from './WorkoutDetail';
 
 const MAX_IMPORT_BYTES = 20 * 1024 * 1024;
 
 type Status = { kind: 'success'; message: string } | { kind: 'error'; message: string; details: string[] } | null;
+
+/** Light / dark / follow-the-phone switch (a per-device setting, not part of the backup). */
+function ThemeCard() {
+  const [preference, choose] = useThemePreference();
+  return (
+    <section className="card">
+      <h2>מראה</h2>
+      <div className="segmented" role="radiogroup" aria-label="מראה האפליקציה">
+        {THEME_PREFERENCES.map((p) => (
+          <button
+            key={p}
+            type="button"
+            role="radio"
+            aria-checked={preference === p}
+            className={`segmented__item ${preference === p ? 'segmented__item--on' : ''}`}
+            onClick={() => choose(p)}
+          >
+            {THEME_LABELS_HE[p]}
+          </button>
+        ))}
+      </div>
+      <p className="small muted">"לפי הטלפון" עובר לבד בין בהיר לכהה לפי הגדרת המכשיר.</p>
+    </section>
+  );
+}
 
 export function DataScreen() {
   const { data, update } = useApp();
@@ -69,7 +96,8 @@ export function DataScreen() {
 
   return (
     <div className="stack">
-      <ScreenHeader title="גיבוי ונתונים" />
+      <ScreenHeader title="גיבוי והגדרות" />
+      <ThemeCard />
       <section className="card">
         <h2>הנתונים שלך</h2>
         <div className="stat-grid">

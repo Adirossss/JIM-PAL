@@ -4,7 +4,10 @@ import { emptyAppData } from './schema';
 import {
   CORRUPT_BACKUP_PREFIX,
   STORAGE_KEY,
+  THEME_KEY,
   loadAppData,
+  loadThemePreference,
+  saveThemePreference,
   memoryStore,
   saveAppData,
   subscribeToExternalChanges,
@@ -81,6 +84,21 @@ describe('storage', () => {
     unsubscribe();
     fire(STORAGE_KEY, JSON.stringify(emptyAppData()));
     expect(received).toHaveLength(1);
+  });
+
+  it('stores the theme preference under its own key, defaulting to light', () => {
+    const store = memoryStore();
+    expect(loadThemePreference(store)).toBe('light');
+    saveThemePreference(store, 'dark');
+    expect(store.getItem(THEME_KEY)).toBe('dark');
+    expect(loadThemePreference(store)).toBe('dark');
+    store.setItem(THEME_KEY, 'garbage');
+    expect(loadThemePreference(store)).toBe('light');
+    // Never mixed into the workout data.
+    expect(store.getItem(STORAGE_KEY)).toBeNull();
+    const broken: KeyValueStore = { getItem: () => { throw new Error('x'); }, setItem: () => { throw new Error('x'); } };
+    expect(loadThemePreference(broken)).toBe('light');
+    expect(() => saveThemePreference(broken, 'dark')).not.toThrow();
   });
 
   it('reports a failed save without throwing', () => {
