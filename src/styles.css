@@ -1022,6 +1022,120 @@ h2.exercise-title .exercise-title__he {
   padding-inline: 4px;
 }
 
+/* ── One-tap tiles (recent exercises) ───────────────────── */
+
+.tile-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.tile {
+  min-height: 108px;
+  padding: 14px;
+  border: none;
+  border-radius: var(--radius-inner);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  text-align: start;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  cursor: pointer;
+  transition: transform 120ms ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.tile:active {
+  transform: scale(0.96);
+}
+
+.tile:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.tile__title {
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.tile__sub {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.tile__action {
+  margin-top: auto;
+  align-self: flex-end;
+  min-width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  background: var(--primary);
+  color: var(--primary-text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 0 8px;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.tile--added {
+  background: var(--primary);
+  color: var(--primary-text);
+}
+
+.tile--added .tile__sub {
+  color: color-mix(in srgb, var(--primary-text) 70%, transparent);
+}
+
+.tile--added .tile__action {
+  background: var(--surface);
+  color: var(--text);
+}
+
+/* Suggestions from the previous workout. */
+.suggest-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--panel);
+  border-radius: 20px;
+  padding: 10px 10px 10px 14px;
+  padding-inline-start: 14px;
+}
+
+.suggest-row__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.suggest-row__text strong {
+  font-weight: 600;
+}
+
+.suggest-row__text span {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.repeat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 2px;
+}
+
+.repeat-row + .repeat-row {
+  border-top: 1px solid var(--line);
+}
+
 /* ── Active workout ─────────────────────────────────────── */
 
 .entry {

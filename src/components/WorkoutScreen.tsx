@@ -18,11 +18,19 @@ import {
   sortWorkoutsNewestFirst,
   summarizeWorkout,
 } from '../lib/stats';
-import { addExercise, finishWorkout, setWorkoutDate, setWorkoutNote, startWorkout } from '../lib/workout';
+import {
+  addExercise,
+  finishWorkout,
+  setWorkoutDate,
+  setWorkoutNote,
+  startWorkout,
+  startWorkoutFrom,
+  suggestNextExercises,
+} from '../lib/workout';
 import { useApp } from '../state/AppContext';
 import { useConfirm } from '../state/confirm';
 import { MUSCLE_LABELS_HE, type Workout } from '../types';
-import { DateField, EmptyState, Icon, ScreenHeader } from './common';
+import { DateField, EmptyState, Icon, ScreenHeader, formatSet } from './common';
 import { ExerciseEntryCard } from './ExerciseEntryCard';
 import { ExercisePicker } from './ExercisePicker';
 
@@ -80,6 +88,12 @@ function Home() {
           <>
             {recentExerciseChips(recentlyUsedExerciseIds(data.workouts).slice(0, 8))}
             {lastWorkoutCard(last)}
+            <RepeatWorkouts
+              title="חזור על אימון קודם"
+              onRepeat={(source) =>
+                update((prev) => ({ ...prev, activeWorkout: startWorkoutFrom(source, new Date(), isValidDateString(date) ? date : today) }))
+              }
+            />
             {highlights()}
           </>
         ) : (
@@ -194,6 +208,109 @@ function Home() {
   }
 }
 
+/** The last few workouts, each with a "חזור" button that starts a workout with the same exercises. */
+function RepeatWorkouts({ title, onRepeat }: { title: string; onRepeat: (source: Workout) => void }) {
+  const { data, exerciseById } = useApp();
+  const today = toLocalDateString(new Date());
+  const recent = sortWorkoutsNewestFirst(data.workouts).slice(0, 3);
+  if (recent.length === 0) return null;
+
+  return (
+    <section className="card" aria-label={title} style={{ gap: 4 }}>
+      <h3>{title}</h3>
+      <div>
+        {recent.map((w) => {
+          const s = summarizeWorkout(w);
+          const muscles = [
+            ...new Set(
+              w.exercises.map((e) => {
+                const m = exerciseById.get(e.exerciseId)?.primaryMuscle;
+                return m ? MUSCLE_LABELS_HE[m] : 'אחר';
+              }),
+            ),
+          ];
+          return (
+            <div key={w.id} className="repeat-row">
+              <span className="headline">
+                <span style={{ fontWeight: 600 }}>
+                  {relativeDayHe(w.date, today)} · {muscles.join(', ')}
+                </span>
+                <span className="headline__stats">
+                  {s.exerciseCount} תרגילים · {s.setCount} סטים
+                </span>
+              </span>
+              <button
+                type="button"
+                className="btn btn--secondary btn--small"
+                aria-label={`חזור על האימון מ-${formatDateHe(w.date)}`}
+                onClick={() => onRepeat(w)}
+              >
+                חזור
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+/** "What else did you do last time?" — one tap adds the exercises that followed. */
+function SuggestionsCard({ workout, onAdd }: { workout: Workout; onAdd: (exerciseIds: string[]) => void }) {
+  const { data, exerciseById } = useApp();
+  const suggestions = suggestNextExercises(workout, data.workouts);
+  if (!suggestions) return null;
+  const name = (id: string) => exerciseById.get(id)?.nameHe ?? 'תרגיל לא מוכר';
+
+  return (
+    <section className="card" aria-label="הצעות מהאימון הקודם">
+      <div className="stack" style={{ gap: 2 }}>
+        <h3>מה עוד היה בפעם הקודמת?</h3>
+        <span className="small muted">
+          {formatDateHe(suggestions.sourceDate)} · אחרי {name(suggestions.afterExerciseId)} עשית:
+        </span>
+      </div>
+      {suggestions.items.map((item) => {
+        const exercise = exerciseById.get(item.exerciseId);
+        const lastSet = item.sets[item.sets.length - 1];
+        return (
+          <div key={item.exerciseId} className="suggest-row">
+            <span className="suggest-row__text">
+              <strong>{name(item.exerciseId)}</strong>
+              <span>
+                {item.sets.length} סטים
+                {exercise && lastSet && (
+                  <>
+                    {' · '}
+                    <bdi>{formatSet(lastSet, exercise.equipment)}</bdi>
+                  </>
+                )}
+              </span>
+            </span>
+            <button
+              type="button"
+              className="icon-btn icon-btn--dark"
+              aria-label={`הוסף ${name(item.exerciseId)}`}
+              onClick={() => onAdd([item.exerciseId])}
+            >
+              <Icon name="plus" />
+            </button>
+          </div>
+        );
+      })}
+      {suggestions.items.length > 1 && (
+        <button
+          type="button"
+          className="btn btn--primary btn--large"
+          onClick={() => onAdd(suggestions.items.map((i) => i.exerciseId))}
+        >
+          הוסף את כל {suggestions.items.length}
+        </button>
+      )}
+    </section>
+  );
+}
+
 /** Headline used by the history list. */
 export function WorkoutHeadline({ workout }: { workout: Workout }) {
   const { exerciseById } = useApp();
@@ -223,6 +340,14 @@ function ActiveWorkout({ workout }: { workout: Workout }) {
   const summary = summarizeWorkout(workout);
   // The chosen exercise, else the most recently added one.
   const selected = workout.exercises.find((e) => e.id === selectedId) ?? workout.exercises.at(-1);
+
+  /** Adds exercises in order and selects the first one added. */
+  const addExercises = (exerciseIds: string[]) => {
+    const entryIds = exerciseIds.map(() => createId());
+    setError(null);
+    updateActive((w) => exerciseIds.reduce((acc, id, i) => addExercise(acc, id, () => entryIds[i]!), w));
+    if (entryIds[0]) setSelectedId(entryIds[0]);
+  };
 
   // Keep the selected chip visible in the horizontally scrolling row.
   useEffect(() => {
@@ -352,14 +477,24 @@ function ActiveWorkout({ workout }: { workout: Workout }) {
           onRemoved={() => setSelectedId(null)}
         />
       ) : (
-        <EmptyState title="עוד לא הוספת תרגילים">
-          <p className="muted small">בחר תרגיל מהספרייה כדי להתחיל לרשום סטים.</p>
-          <button type="button" className="btn btn--primary" onClick={() => setPicking(true)}>
-            <Icon name="plus" size={18} />
-            הוסף תרגיל
-          </button>
-        </EmptyState>
+        <>
+          <EmptyState title="עוד לא הוספת תרגילים">
+            <p className="muted small">בחר תרגיל מהספרייה כדי להתחיל לרשום סטים.</p>
+            <button type="button" className="btn btn--primary" onClick={() => setPicking(true)}>
+              <Icon name="plus" size={18} />
+              הוסף תרגיל
+            </button>
+          </EmptyState>
+          <RepeatWorkouts
+            title="או התחל כמו אימון קודם"
+            onRepeat={(source) =>
+              updateActive((w) => ({ ...w, exercises: startWorkoutFrom(source, new Date(w.startedAt), w.date).exercises }))
+            }
+          />
+        </>
       )}
+
+      <SuggestionsCard workout={workout} onAdd={addExercises} />
 
       <div className="finish-bar">
         <button type="button" className="btn btn--ghost btn--danger" onClick={discard}>
@@ -372,10 +507,7 @@ function ActiveWorkout({ workout }: { workout: Workout }) {
           markedIds={addedIds}
           onClose={() => setPicking(false)}
           onPick={(exercise) => {
-            const entryId = createId();
-            setError(null);
-            updateActive((w) => addExercise(w, exercise.id, () => entryId));
-            setSelectedId(entryId);
+            addExercises([exercise.id]);
             setPicking(false);
           }}
         />

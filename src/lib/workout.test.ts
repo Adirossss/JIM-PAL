@@ -14,6 +14,8 @@ import {
   setWorkoutDate,
   setWorkoutNote,
   startWorkout,
+  startWorkoutFrom,
+  suggestNextExercises,
   stepReps,
   stepWeight,
   updateSet,
@@ -160,6 +162,51 @@ describe('validateSetInput', () => {
     expect(validateSetInput('50', '0', 'cable').ok).toBe(false);
     expect(validateSetInput('50', '7.5', 'cable').ok).toBe(false);
     expect(validateSetInput('50', '', 'cable').ok).toBe(false);
+  });
+});
+
+describe('repeat and suggestions', () => {
+  const set = (weight: number, reps: number, id: string) => ({ id, weight, reps });
+  const past = (id: string, date: string, ids: string[]): Workout => ({
+    id, date, startedAt: `${date}T10:00:00.000Z`, finishedAt: `${date}T11:00:00.000Z`, note: '',
+    exercises: ids.map((exerciseId, i) => ({ id: `${id}-${i}`, exerciseId, note: '', sets: [set(50, 10, `${id}-${i}-s`)] })),
+  });
+  const chestDay = past('chest', '2026-10-15', ['bench', 'incline', 'fly', 'pushdown']);
+  const legDay = past('legs', '2026-10-20', ['squat', 'leg-press', 'bench']);
+
+  it('starts a workout with the same exercises, once each, and no sets', () => {
+    const withDup: Workout = { ...chestDay, exercises: [...chestDay.exercises, chestDay.exercises[0]!] };
+    const w = startWorkoutFrom(withDup, NOW, undefined, ids());
+    expect(w.date).toBe('2026-10-22');
+    expect(w.finishedAt).toBeNull();
+    expect(w.exercises.map((e) => e.exerciseId)).toEqual(['bench', 'incline', 'fly', 'pushdown']);
+    expect(w.exercises.every((e) => e.sets.length === 0 && e.note === '')).toBe(true);
+  });
+
+  it('suggests what followed the current exercise last time, after-first', () => {
+    let w = addExercise(startWorkout(NOW, undefined, () => 'cur'), 'incline', () => 'e1');
+    expect(suggestNextExercises(w, [chestDay, legDay])).toBeNull(); // no sets yet
+    w = addSet(w, 'e1', { weight: 30, reps: 10 }, () => 's1');
+    const s = suggestNextExercises(w, [chestDay, legDay]);
+    expect(s?.sourceDate).toBe('2026-10-15');
+    expect(s?.afterExerciseId).toBe('incline');
+    expect(s?.items.map((i) => i.exerciseId)).toEqual(['fly', 'pushdown', 'bench']);
+    expect(suggestNextExercises(w, [chestDay], 2)?.items).toHaveLength(2);
+  });
+
+  it('uses the most recent workout with the exercise and skips ones already added', () => {
+    let w = addExercise(startWorkout(NOW, undefined, () => 'cur'), 'bench', () => 'e1');
+    w = addSet(w, 'e1', { weight: 80, reps: 8 }, () => 's1');
+    w = addExercise(w, 'squat', () => 'e2');
+    // 'bench' was last done on leg day (newest): after it nothing, before it squat (added) and leg-press.
+    expect(suggestNextExercises(w, [chestDay, legDay])?.items.map((i) => i.exerciseId)).toEqual(['leg-press']);
+  });
+
+  it('returns null when there is nothing new to suggest', () => {
+    let w = addExercise(startWorkout(NOW, undefined, () => 'cur'), 'deadlift', () => 'e1');
+    w = addSet(w, 'e1', { weight: 120, reps: 5 }, () => 's1');
+    expect(suggestNextExercises(w, [chestDay, legDay])).toBeNull(); // never done before
+    expect(suggestNextExercises(w, [])).toBeNull();
   });
 });
 

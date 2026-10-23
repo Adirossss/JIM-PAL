@@ -5,6 +5,7 @@ import {
   countWorkoutsThisWeek,
   estimateOneRepMax,
   percentChange,
+  recentExercises,
   recentHighlights,
   recentVolumes,
   startOfWeek,
@@ -179,6 +180,15 @@ describe('per-exercise history', () => {
     expect(percentChange(0, 500)).toBeNull();
     expect(recentHighlights(history, 2).map((h) => h.exerciseId)).toEqual(['squat', 'bench']);
     expect(recentHighlights(history, 1)[0]?.bestOneRepMax).toBeCloseTo(110 * 1.1);
+  });
+
+  it('lists recent exercises with their last set and date', () => {
+    expect(recentExercises(history, 5).map((r) => [r.exerciseId, r.lastDate, r.lastSet.weight, r.lastSet.reps])).toEqual([
+      ['squat', '2026-10-05', 110, 3],
+      ['bench', '2026-10-01', 70, 10],
+    ]);
+    expect(recentExercises(history, 1)).toHaveLength(1);
+    expect(recentExercises([], 5)).toEqual([]);
   });
 
   it('summarizes a workout and lists recently used exercises', () => {

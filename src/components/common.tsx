@@ -154,7 +154,8 @@ export function ExerciseTags({ exercise }: { exercise: Exercise }) {
 /** "82.5 ק"ג × 6", or for bodyweight "משקל גוף × 10" / "משקל גוף +10 ק"ג × 6". */
 export function formatSet(set: SetEntry, equipment: EquipmentType): string {
   if (equipment === 'bodyweight') {
-    const load = set.weight ? ` +${formatKg(set.weight)} ק"ג` : '';
+    // LRI…PDI keeps "+10" from rendering as "10+" inside right-to-left text.
+    const load = set.weight ? ` ⁦+${formatKg(set.weight)}⁩ ק"ג` : '';
     return `משקל גוף${load} × ${set.reps}`;
   }
   return `${formatKg(set.weight ?? 0)} ק"ג × ${set.reps}`;

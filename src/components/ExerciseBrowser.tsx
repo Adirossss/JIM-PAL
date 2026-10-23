@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { searchExercises } from '../lib/exercises';
 import { useApp } from '../state/AppContext';
 import {
@@ -17,9 +17,11 @@ interface Props {
   autoFocus?: boolean;
   /** Ids shown with a "נוסף" badge (e.g. already in the current workout). */
   markedIds?: ReadonlySet<string>;
+  /** Shown above the full list while no search or filter is active (e.g. recent exercises). */
+  unfilteredTop?: ReactNode;
 }
 
-export function ExerciseBrowser({ onSelect, autoFocus = false, markedIds }: Props) {
+export function ExerciseBrowser({ onSelect, autoFocus = false, markedIds, unfilteredTop }: Props) {
   const { exercises } = useApp();
   const [query, setQuery] = useState('');
   const [muscle, setMuscle] = useState<MuscleGroup | ''>('');
@@ -96,6 +98,8 @@ export function ExerciseBrowser({ onSelect, autoFocus = false, markedIds }: Prop
           )}
         </div>
       </div>
+
+      {!filtered && unfilteredTop}
 
       {results.length === 0 ? (
         <p className="muted center">לא נמצאו תרגילים.</p>

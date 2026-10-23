@@ -238,6 +238,25 @@ export function recentHighlights(workouts: readonly Workout[], count: number): E
   return result;
 }
 
+export interface RecentExercise {
+  exerciseId: string;
+  /** The last set logged for it, in its most recent session. */
+  lastSet: SetEntry;
+  lastDate: string;
+}
+
+/** The most recently used exercises with their last set, for one-tap re-adding. */
+export function recentExercises(workouts: readonly Workout[], count: number): RecentExercise[] {
+  const result: RecentExercise[] = [];
+  for (const exerciseId of recentlyUsedExerciseIds(workouts)) {
+    const session = exerciseSessions(workouts, exerciseId)[0];
+    const lastSet = session?.sets[session.sets.length - 1];
+    if (session && lastSet) result.push({ exerciseId, lastSet, lastDate: session.date });
+    if (result.length === count) break;
+  }
+  return result;
+}
+
 /** Ids of exercises that appear in at least one workout, most recently used first. */
 export function recentlyUsedExerciseIds(workouts: readonly Workout[]): string[] {
   const seen = new Set<string>();

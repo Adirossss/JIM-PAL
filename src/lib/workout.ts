@@ -17,6 +17,70 @@ export function startWorkout(now: Date, date = toLocalDateString(now), newId: Id
   };
 }
 
+/**
+ * "Repeat a past workout": a new workout with the same exercises in the same
+ * order (each once) and no sets; each set form then pre-fills from history.
+ */
+export function startWorkoutFrom(
+  source: Workout,
+  now: Date,
+  date = toLocalDateString(now),
+  newId: IdFactory = createId,
+): Workout {
+  let workout = startWorkout(now, date, newId);
+  const seen = new Set<string>();
+  for (const e of source.exercises) {
+    if (seen.has(e.exerciseId)) continue;
+    seen.add(e.exerciseId);
+    workout = addExercise(workout, e.exerciseId, newId);
+  }
+  return workout;
+}
+
+export interface SuggestedExercise {
+  exerciseId: string;
+  /** The sets done in the past workout the suggestion comes from. */
+  sets: SetEntry[];
+}
+
+export interface Suggestions {
+  sourceDate: string;
+  /** The current exercise the suggestions follow. */
+  afterExerciseId: string;
+  items: SuggestedExercise[];
+}
+
+/**
+ * "What else did you do last time?": takes the latest exercise in the current
+ * workout that has sets, finds the most recent past workout with it, and
+ * suggests that workout's other exercises (those after it first) that are not
+ * in the current workout yet. Null when there is nothing to suggest.
+ */
+export function suggestNextExercises(
+  current: Workout,
+  history: readonly Workout[],
+  limit = 3,
+): Suggestions | null {
+  const anchor = [...current.exercises].reverse().find((e) => e.sets.length > 0);
+  if (!anchor) return null;
+  const inCurrent = new Set(current.exercises.map((e) => e.exerciseId));
+
+  for (const w of sortWorkoutsNewestFirst(history)) {
+    if (w.id === current.id) continue;
+    const index = w.exercises.findIndex((e) => e.exerciseId === anchor.exerciseId);
+    if (index < 0) continue;
+    const items: SuggestedExercise[] = [];
+    for (const e of [...w.exercises.slice(index + 1), ...w.exercises.slice(0, index)]) {
+      if (inCurrent.has(e.exerciseId) || e.sets.length === 0) continue;
+      if (items.some((i) => i.exerciseId === e.exerciseId)) continue;
+      items.push({ exerciseId: e.exerciseId, sets: e.sets });
+      if (items.length === limit) break;
+    }
+    return items.length > 0 ? { sourceDate: w.date, afterExerciseId: anchor.exerciseId, items } : null;
+  }
+  return null;
+}
+
 export function setWorkoutDate(workout: Workout, date: string): Workout {
   return { ...workout, date };
 }
