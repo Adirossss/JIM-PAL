@@ -10,13 +10,17 @@ import {
   type Workout,
   type WorkoutExercise,
   type WorkoutTemplate,
+  type BodyEntry,
 } from '../types';
 import { isValidDateString } from './format';
 import { MAX_REPS, MAX_WEIGHT_KG } from './workout';
 
-export const CURRENT_SCHEMA_VERSION = 2;
+export const CURRENT_SCHEMA_VERSION = 3;
 export const EXPORT_APP_ID = 'jim-pal';
 export const MAX_TEMPLATE_NAME = 60;
+/** Plausible ranges for body measurements. */
+export const BODY_WEIGHT_RANGE = { min: 20, max: 400 } as const;
+export const BODY_CM_RANGE = { min: 10, max: 300 } as const;
 
 export function emptyAppData(): AppData {
   return {
@@ -26,6 +30,7 @@ export function emptyAppData(): AppData {
     activeWorkout: null,
     favoriteExerciseIds: [],
     templates: [],
+    bodyEntries: [],
   };
 }
 
@@ -34,6 +39,8 @@ type Migration = (data: Record<string, unknown>) => Record<string, unknown>;
 export const MIGRATIONS: Readonly<Record<number, Migration>> = {
   // v2 adds favorites and workout templates; nothing existing changes.
   1: (data) => ({ ...data, favoriteExerciseIds: [], templates: [] }),
+  // v3 adds body entries (drop sets and supersets are optional fields on existing records).
+  2: (data) => ({ ...data, bodyEntries: [] }),
 };
 
 export type Result<T> = { ok: true; value: T } | { ok: false; errors: string[] };
@@ -124,18 +131,55 @@ class Validator {
     if (!(typeof reps === 'number' && Number.isInteger(reps) && reps >= 0 && reps <= MAX_REPS)) {
       this.fail(`${path}.reps`, `חייב להיות מספר שלם בין 0 ל-${MAX_REPS}`);
     }
-    return { id, weight: weight as number | null, reps: reps as number };
+    if (o.drop !== undefined && typeof o.drop !== 'boolean') this.fail(`${path}.drop`, 'חייב להיות true/false');
+    return { id, weight: weight as number | null, reps: reps as number, ...(o.drop === true ? { drop: true } : {}) };
   }
 
   workoutExercise(v: unknown, path: string): WorkoutExercise | null {
     const o = this.object(v, path);
     if (!o) return null;
+    const supersetId = o.supersetId;
+    if (supersetId !== undefined && (typeof supersetId !== 'string' || supersetId.trim() === '')) {
+      this.fail(`${path}.supersetId`, 'חייב להיות מזהה לא ריק');
+    }
     return {
       id: this.string(o, 'id', path, { nonEmpty: true }),
       exerciseId: this.string(o, 'exerciseId', path, { nonEmpty: true }),
       note: this.string(o, 'note', path),
       sets: this.array(o, 'sets', path).map((s, i) => this.set(s, `${path}.sets[${i}]`)) as SetEntry[],
+      ...(typeof supersetId === 'string' && supersetId.trim() ? { supersetId } : {}),
     };
+  }
+
+  /** null, or a number within range; reports otherwise. */
+  measurement(o: Obj, key: string, path: string, range: { min: number; max: number }): number | null {
+    const value = o[key];
+    if (value === null) return null;
+    if (typeof value !== 'number' || !Number.isFinite(value) || value < range.min || value > range.max) {
+      this.fail(`${path}.${key}`, `חייב להיות null או מספר בין ${range.min} ל-${range.max}`);
+      return null;
+    }
+    return value;
+  }
+
+  bodyEntry(v: unknown, path: string): BodyEntry | null {
+    const o = this.object(v, path);
+    if (!o) return null;
+    const date = this.string(o, 'date', path);
+    if (!isValidDateString(date)) this.fail(`${path}.date`, 'תאריך לא תקין (YYYY-MM-DD)');
+    const entry: BodyEntry = {
+      id: this.string(o, 'id', path, { nonEmpty: true }),
+      date,
+      weight: this.measurement(o, 'weight', path, BODY_WEIGHT_RANGE),
+      waist: this.measurement(o, 'waist', path, BODY_CM_RANGE),
+      chest: this.measurement(o, 'chest', path, BODY_CM_RANGE),
+      arm: this.measurement(o, 'arm', path, BODY_CM_RANGE),
+      note: this.string(o, 'note', path),
+    };
+    if (entry.weight === null && entry.waist === null && entry.chest === null && entry.arm === null) {
+      this.fail(path, 'חייב לפחות מדידה אחת');
+    }
+    return entry;
   }
 
   workout(v: unknown, path: string, finished: boolean): Workout | null {
@@ -208,6 +252,9 @@ export function validateAppData(value: unknown): Result<AppData> {
   const templates = v
     .array(o, 'templates', 'root')
     .map((t, i) => v.template(t, `templates[${i}]`)) as WorkoutTemplate[];
+  const bodyEntries = v
+    .array(o, 'bodyEntries', 'root')
+    .map((b, i) => v.bodyEntry(b, `bodyEntries[${i}]`)) as BodyEntry[];
 
   if (v.errors.length === 0) {
     const seedIds = new Set(SEED_EXERCISES.map((e) => e.id));
@@ -218,6 +265,7 @@ export function validateAppData(value: unknown): Result<AppData> {
     v.unique([...workouts, ...(activeWorkout ? [activeWorkout] : [])].map((w) => w.id), 'workouts', 'מזהה אימון');
     v.unique(favoriteExerciseIds, 'favoriteExerciseIds', 'מועדף');
     v.unique(templates.map((t) => t.id), 'templates', 'מזהה תבנית');
+    v.unique(bodyEntries.map((b) => b.id), 'bodyEntries', 'מזהה מדידה');
   }
 
   if (v.errors.length > 0) return { ok: false, errors: v.errors };
@@ -230,6 +278,7 @@ export function validateAppData(value: unknown): Result<AppData> {
       activeWorkout,
       favoriteExerciseIds,
       templates,
+      bodyEntries,
     },
   };
 }

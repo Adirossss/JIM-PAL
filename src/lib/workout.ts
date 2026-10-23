@@ -100,7 +100,7 @@ export function addExercise(workout: Workout, exerciseId: string, newId: IdFacto
 }
 
 export function removeExercise(workout: Workout, entryId: string): Workout {
-  return { ...workout, exercises: workout.exercises.filter((e) => e.id !== entryId) };
+  return normalizeSupersets({ ...workout, exercises: workout.exercises.filter((e) => e.id !== entryId) });
 }
 
 /** Moves an exercise entry one position up (-1) or down (+1). */
@@ -110,7 +110,73 @@ export function moveExercise(workout: Workout, entryId: string, direction: -1 | 
   if (i < 0 || j < 0 || j >= workout.exercises.length) return workout;
   const exercises = [...workout.exercises];
   [exercises[i], exercises[j]] = [exercises[j]!, exercises[i]!];
-  return { ...workout, exercises };
+  return normalizeSupersets({ ...workout, exercises });
+}
+
+// ── Supersets ─────────────────────────────────────────────────────────────
+// A superset is a run of consecutive entries sharing a supersetId.
+
+/** Entry ids of the superset `entryId` belongs to, in order (just itself if none). */
+export function supersetGroup(workout: Workout, entryId: string): string[] {
+  const list = workout.exercises;
+  const i = list.findIndex((e) => e.id === entryId);
+  const id = list[i]?.supersetId;
+  if (i < 0) return [];
+  if (!id) return [entryId];
+  let start = i;
+  while (start > 0 && list[start - 1]!.supersetId === id) start -= 1;
+  let end = i;
+  while (end < list.length - 1 && list[end + 1]!.supersetId === id) end += 1;
+  return list.slice(start, end + 1).map((e) => e.id);
+}
+
+/** Drops superset ids that no longer join at least two consecutive entries. */
+export function normalizeSupersets(workout: Workout): Workout {
+  const list = workout.exercises;
+  let changed = false;
+  const exercises = list.map((e, i) => {
+    if (!e.supersetId) return e;
+    const joined = list[i - 1]?.supersetId === e.supersetId || list[i + 1]?.supersetId === e.supersetId;
+    if (joined) return e;
+    changed = true;
+    const { supersetId: _dropped, ...rest } = e;
+    return rest;
+  });
+  return changed ? { ...workout, exercises } : workout;
+}
+
+/** Joins an entry with the one after it into a superset (extending an existing one). */
+export function linkWithNext(workout: Workout, entryId: string, newId: IdFactory = createId): Workout {
+  const i = workout.exercises.findIndex((e) => e.id === entryId);
+  const current = workout.exercises[i];
+  const next = workout.exercises[i + 1];
+  if (!current || !next) return workout;
+  const id = current.supersetId ?? next.supersetId ?? `ss-${newId()}`;
+  // If the next entry already belongs to another superset, its whole group joins this one.
+  const nextGroup = new Set(supersetGroup(workout, next.id));
+  return {
+    ...workout,
+    exercises: workout.exercises.map((e) =>
+      e.id === current.id || nextGroup.has(e.id) ? { ...e, supersetId: id } : e,
+    ),
+  };
+}
+
+/** Takes an entry out of its superset (a group left with one entry dissolves). */
+export function unlinkFromSuperset(workout: Workout, entryId: string): Workout {
+  return normalizeSupersets(
+    updateEntry(workout, entryId, (e) => {
+      const { supersetId: _removed, ...rest } = e;
+      return rest;
+    }),
+  );
+}
+
+/** The entry to go to after a set of `entryId` in a superset (cycling), or null. */
+export function nextInSuperset(workout: Workout, entryId: string): string | null {
+  const group = supersetGroup(workout, entryId);
+  if (group.length < 2) return null;
+  return group[(group.indexOf(entryId) + 1) % group.length] ?? null;
 }
 
 function updateEntry(
@@ -131,19 +197,26 @@ export function setExerciseNote(workout: Workout, entryId: string, note: string)
 export interface SetValues {
   weight: number | null;
   reps: number;
+  /** A drop set; omitted or false = a normal set. */
+  drop?: boolean;
+}
+
+/** A set record from form values; `drop` is stored only when true. */
+function toSet(id: string, values: SetValues): SetEntry {
+  return { id, weight: values.weight, reps: values.reps, ...(values.drop ? { drop: true } : {}) };
 }
 
 export function addSet(workout: Workout, entryId: string, values: SetValues, newId: IdFactory = createId): Workout {
   return updateEntry(workout, entryId, (e) => ({
     ...e,
-    sets: [...e.sets, { id: newId(), weight: values.weight, reps: values.reps }],
+    sets: [...e.sets, toSet(newId(), values)],
   }));
 }
 
 export function updateSet(workout: Workout, entryId: string, setId: string, values: SetValues): Workout {
   return updateEntry(workout, entryId, (e) => ({
     ...e,
-    sets: e.sets.map((s) => (s.id === setId ? { ...s, weight: values.weight, reps: values.reps } : s)),
+    sets: e.sets.map((s) => (s.id === setId ? toSet(s.id, values) : s)),
   }));
 }
 
@@ -190,9 +263,11 @@ export function duplicateLastSet(
 ): Workout {
   const entry = workout.exercises.find((e) => e.id === entryId);
   if (!entry) return workout;
-  const source = entry.sets[entry.sets.length - 1] ?? lastLoggedSet(entry.exerciseId, null, history);
+  const ownLast = entry.sets[entry.sets.length - 1];
+  const source = ownLast ?? lastLoggedSet(entry.exerciseId, null, history);
   if (!source) return workout;
-  return addSet(workout, entryId, { weight: source.weight, reps: source.reps }, newId);
+  // A drop set is copied as a drop set only within the same exercise entry.
+  return addSet(workout, entryId, { weight: source.weight, reps: source.reps, drop: !!ownLast?.drop }, newId);
 }
 
 export type SetInputResult = { ok: true; values: SetValues } | { ok: false; error: string };
@@ -300,5 +375,5 @@ export function finishWorkout(workout: Workout, now: Date): FinishResult {
   if (exercises.length === 0) {
     return { ok: false, error: 'אי אפשר לסיים אימון בלי אף סט. הוסף סט או בטל את האימון.' };
   }
-  return { ok: true, workout: { ...workout, exercises, finishedAt: now.toISOString() } };
+  return { ok: true, workout: normalizeSupersets({ ...workout, exercises, finishedAt: now.toISOString() }) };
 }

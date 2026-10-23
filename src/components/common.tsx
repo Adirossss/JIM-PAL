@@ -45,6 +45,7 @@ const ICON_PATHS = {
   star: 'M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.8-5.2 2.8 1-5.8-4.3-4.1 5.9-.9z',
   trophy: 'M8 4h8v5a4 4 0 0 1-8 0V4zM8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13v4M8 20h8M10 17h4',
   trend: 'M4 16l6-6 4 4 6-7M15 7h5v5',
+  link: 'M10 14a4 4 0 0 0 5.66 0l3-3a4 4 0 0 0-5.66-5.66l-1 1M14 10a4 4 0 0 0-5.66 0l-3 3a4 4 0 0 0 5.66 5.66l1-1',
   flame: 'M12 3c.5 3 4 5 4 9.5a4 4 0 0 1-8 0c0-2 1-3.4 2.3-4.4-.1 1.8.7 3 1.7 3.4.2-3.1-.6-5.6 0-8.5z',
   bookmark: 'M7 4h10v16l-5-3.5L7 20z',
 } as const;
@@ -183,14 +184,14 @@ export function ExerciseTags({ exercise }: { exercise: Exercise }) {
   );
 }
 
-/** "82.5 ק"ג × 6", or for bodyweight "משקל גוף × 10" / "משקל גוף +10 ק"ג × 6". */
+/** "82.5 ק"ג × 6", bodyweight "משקל גוף × 10" / "משקל גוף +10 ק"ג × 6"; a drop set ends with " · דרופ". */
 export function formatSet(set: SetEntry, equipment: EquipmentType): string {
   if (equipment === 'bodyweight') {
     // LRI…PDI keeps "+10" from rendering as "10+" inside right-to-left text.
     const load = set.weight ? ` ⁦+${formatKg(set.weight)}⁩ ק"ג` : '';
-    return `משקל גוף${load} × ${set.reps}`;
+    return `משקל גוף${load} × ${set.reps}${set.drop ? ' · דרופ' : ''}`;
   }
-  return `${formatKg(set.weight ?? 0)} ק"ג × ${set.reps}`;
+  return `${formatKg(set.weight ?? 0)} ק"ג × ${set.reps}${set.drop ? ' · דרופ' : ''}`;
 }
 
 export function SetText({ set, equipment }: { set: SetEntry; equipment: EquipmentType }) {

@@ -1,11 +1,12 @@
-import { useCallback, useEffect, useId, useMemo, useRef, useState, type FormEvent } from 'react';
+import { useId, useMemo, useState, type FormEvent } from 'react';
 import { formatDateHe, formatKg } from '../lib/format';
-import { exerciseSessions, personalRecordSetIds, setOneRepMax } from '../lib/stats';
+import { exerciseSessions, personalRecordSetIds } from '../lib/stats';
 import {
   addSet,
   deleteSet,
   duplicateLastSet,
   lastLoggedSet,
+  linkWithNext,
   moveExercise,
   removeExercise,
   setExerciseNote,
@@ -13,6 +14,8 @@ import {
   stepReps,
   stepWeight,
   suggestNextSet,
+  supersetGroup,
+  unlinkFromSuperset,
   updateSet,
   validateSetInput,
   type SetValues,
@@ -20,7 +23,7 @@ import {
 import { useApp } from '../state/AppContext';
 import { useConfirm } from '../state/confirm';
 import type { EquipmentType, SetEntry, Workout, WorkoutExercise } from '../types';
-import { ExerciseTags, ExerciseTitle, Icon, Toast, formatSet, useExercise } from './common';
+import { ExerciseTags, ExerciseTitle, Icon, formatSet, useExercise } from './common';
 
 const WEIGHT_STEP_KG = 2.5;
 
@@ -35,29 +38,38 @@ interface Props {
   /** Applies a change to the workout being edited (the active one, or a finished one). */
   onChange: (fn: (workout: Workout) => Workout) => void;
   onRemoved: () => void;
+  /** Called after a set is added (supersets move on to the next exercise). */
+  onSetAdded?: (entryId: string) => void;
 }
 
-export function ExerciseEntryCard({ workout, entry, index, suggest = false, history, onChange, onRemoved }: Props) {
-  const { navigate } = useApp();
+export function ExerciseEntryCard({
+  workout,
+  entry,
+  index,
+  suggest = false,
+  history,
+  onChange,
+  onRemoved,
+  onSetAdded,
+}: Props) {
+  const { navigate, exerciseById } = useApp();
   const confirm = useConfirm();
   const { exercise } = useExercise(entry.exerciseId);
 
-  // Personal records: celebrate a set the moment it is added and beats the best so far.
+  // Personal-record sets get a trophy (the celebration itself lives in the workout screen).
   const records = useMemo(() => personalRecordSetIds([...history, workout]), [history, workout]);
-  const [celebration, setCelebration] = useState<string | null>(null);
-  const clearCelebration = useCallback(() => setCelebration(null), []);
-  const knownSetIds = useRef(new Set(entry.sets.map((s) => s.id)));
-  useEffect(() => {
-    for (const s of entry.sets) {
-      if (!knownSetIds.current.has(s.id) && records.has(s.id)) {
-        setCelebration(`שיא חדש! 1RM משוער ${formatKg(setOneRepMax(s))} ק"ג`);
-        // Browsers refuse (and log) vibration before any real tap on the page.
-        const activation = (navigator as Navigator & { userActivation?: { hasBeenActive: boolean } }).userActivation;
-        if (activation?.hasBeenActive) navigator.vibrate?.([30, 60, 30]);
-      }
-    }
-    knownSetIds.current = new Set(entry.sets.map((s) => s.id));
-  }, [entry.sets, records]);
+  const group = supersetGroup(workout, entry.id);
+  const inSuperset = group.length > 1;
+  const hasNext = index < workout.exercises.length - 1;
+  const groupNames = group.map((id) => {
+    const e = workout.exercises.find((x) => x.id === id);
+    return (e && exerciseById.get(e.exerciseId)?.nameHe) ?? 'תרגיל';
+  });
+  /** A set was added: tell the screen (it moves on to the next exercise of a superset). */
+  const added = (fn: (w: Workout) => Workout) => {
+    onChange(fn);
+    onSetAdded?.(entry.id);
+  };
 
   // Today's recommendation (before the first set); "השתמש" re-seeds the set form.
   const nextSet = suggest && entry.sets.length === 0 ? suggestNextSet(entry.exerciseId, history, exercise.equipment) : null;
@@ -102,6 +114,25 @@ export function ExerciseEntryCard({ workout, entry, index, suggest = false, hist
           <Icon name="chart" />
         </button>
       </div>
+
+      {inSuperset && (
+        <div className="superset-banner">
+          <span className="suggest-set__icon" aria-hidden="true">
+            <Icon name="link" />
+          </span>
+          <span className="suggest-set__text">
+            <strong>סופר-סט: {groupNames.join(' ← ')}</strong>
+            <span>אחרי כל סט עוברים לבד לתרגיל הבא, בלי מנוחה ביניהם.</span>
+          </span>
+          <button
+            type="button"
+            className="btn btn--ghost btn--small"
+            onClick={() => onChange((w) => unlinkFromSuperset(w, entry.id))}
+          >
+            הפרד
+          </button>
+        </div>
+      )}
 
       {previous && (
         <p className="entry__previous">
@@ -165,6 +196,11 @@ export function ExerciseEntryCard({ workout, entry, index, suggest = false, hist
                   <Icon name="trophy" size={13} />
                 </span>
               )}
+              {s.drop && (
+                <span className="set-circle__tag" aria-hidden="true">
+                  דרופ
+                </span>
+              )}
             </button>
           ))}
           {!editing && (
@@ -204,7 +240,7 @@ export function ExerciseEntryCard({ workout, entry, index, suggest = false, hist
           id={formId}
           equipment={exercise.equipment}
           initial={seed ?? setToInputText(lastLoggedSet(entry.exerciseId, workout, history))}
-          onAdd={(values) => onChange((w) => addSet(w, entry.id, values))}
+          onAdd={(values) => added((w) => addSet(w, entry.id, values))}
         />
       )}
 
@@ -225,6 +261,17 @@ export function ExerciseEntryCard({ workout, entry, index, suggest = false, hist
         {!showNote && (
           <button type="button" className="btn btn--ghost btn--small" onClick={() => setShowNote(true)}>
             + הערה
+          </button>
+        )}
+        {hasNext && supersetGroup(workout, workout.exercises[index + 1]!.id).indexOf(entry.id) < 0 && (
+          <button
+            type="button"
+            className="btn btn--ghost btn--small"
+            onClick={() => onChange((w) => linkWithNext(w, entry.id))}
+            aria-label="סופר-סט עם התרגיל הבא"
+          >
+            <Icon name="link" size={16} />
+            סופר-סט עם הבא
           </button>
         )}
         <span style={{ flex: 1 }} />
@@ -256,7 +303,7 @@ export function ExerciseEntryCard({ workout, entry, index, suggest = false, hist
           <button
             type="button"
             className="btn btn--secondary btn--large"
-            onClick={() => onChange((w) => duplicateLastSet(w, entry.id, history))}
+            onClick={() => added((w) => duplicateLastSet(w, entry.id, history))}
             disabled={!canDuplicate}
           >
             שכפל סט אחרון
@@ -266,7 +313,6 @@ export function ExerciseEntryCard({ workout, entry, index, suggest = false, hist
           </button>
         </div>
       )}
-      {celebration && <Toast message={celebration} onDone={clearCelebration} />}
     </section>
   );
 }
@@ -340,6 +386,27 @@ function SetSteppers({
   );
 }
 
+/** Marks the set as a drop set (lighter weight right after, no rest). */
+function DropToggle({ on, onChange }: { on: boolean; onChange: (on: boolean) => void }) {
+  return (
+    <div className="stepper-row">
+      <span className="stepper-row__label">
+        דרופ סט <span className="muted small">(בלי מנוחה)</span>
+      </span>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={on}
+        aria-label="דרופ סט"
+        className={`switch ${on ? 'switch--on' : ''}`}
+        onClick={() => onChange(!on)}
+      >
+        <span className="switch__thumb" />
+      </button>
+    </div>
+  );
+}
+
 function NewSetForm({
   id,
   equipment,
@@ -355,6 +422,8 @@ function NewSetForm({
   // user typed, which after "add" equals the set just logged.
   const [weight, setWeight] = useState(initial.weight);
   const [reps, setReps] = useState(initial.reps);
+  // Stays on for a chain of drop sets until switched off.
+  const [drop, setDrop] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const submit = (e: FormEvent) => {
@@ -365,12 +434,13 @@ function NewSetForm({
       return;
     }
     setError(null);
-    onAdd(result.values);
+    onAdd({ ...result.values, drop });
   };
 
   return (
     <form id={id} className="panel" onSubmit={submit} noValidate aria-label="סט חדש">
       <SetSteppers weight={weight} reps={reps} onWeight={setWeight} onReps={setReps} equipment={equipment} />
+      <DropToggle on={drop} onChange={setDrop} />
       {error && (
         <p className="error" role="alert">
           {error}
@@ -391,13 +461,14 @@ function EditSetPanel({
   set: SetEntry;
   number: number;
   equipment: EquipmentType;
-  onSave: (values: { weight: number | null; reps: number }) => void;
+  onSave: (values: SetValues) => void;
   onDelete: () => void;
   onCancel: () => void;
 }) {
   const text = setToInputText(set);
   const [weight, setWeight] = useState(text.weight);
   const [reps, setReps] = useState(text.reps);
+  const [drop, setDrop] = useState(!!set.drop);
   const [error, setError] = useState<string | null>(null);
 
   const save = (e: FormEvent) => {
@@ -407,13 +478,14 @@ function EditSetPanel({
       setError(result.error);
       return;
     }
-    onSave(result.values);
+    onSave({ ...result.values, drop });
   };
 
   return (
     <form className="edit-panel" onSubmit={save} noValidate aria-label={`עריכת סט ${number}`}>
       <span className="entry__label">עריכת סט {number}</span>
       <SetSteppers weight={weight} reps={reps} onWeight={setWeight} onReps={setReps} equipment={equipment} />
+      <DropToggle on={drop} onChange={setDrop} />
       {error && (
         <p className="error" role="alert">
           {error}

@@ -17,6 +17,10 @@ import {
   startWorkoutFrom,
   suggestNextExercises,
   suggestNextSet,
+  linkWithNext,
+  nextInSuperset,
+  supersetGroup,
+  unlinkFromSuperset,
   stepReps,
   stepWeight,
   updateSet,
@@ -208,6 +212,74 @@ describe('repeat and suggestions', () => {
     w = addSet(w, 'e1', { weight: 120, reps: 5 }, () => 's1');
     expect(suggestNextExercises(w, [chestDay, legDay])).toBeNull(); // never done before
     expect(suggestNextExercises(w, [])).toBeNull();
+  });
+});
+
+describe('drop sets', () => {
+  it('stores the drop flag only when true and copies it within the same exercise', () => {
+    const newId = ids();
+    let w = addExercise(startWorkout(NOW, undefined, newId), 'bench', newId); // e = id2
+    w = addSet(w, 'id2', { weight: 100, reps: 8 }, newId); // id3
+    w = addSet(w, 'id2', { weight: 80, reps: 8, drop: true }, newId); // id4
+    expect(w.exercises[0]!.sets).toEqual([
+      { id: 'id3', weight: 100, reps: 8 },
+      { id: 'id4', weight: 80, reps: 8, drop: true },
+    ]);
+    w = duplicateLastSet(w, 'id2', [], () => 'dup');
+    expect(w.exercises[0]!.sets.at(-1)).toEqual({ id: 'dup', weight: 80, reps: 8, drop: true });
+    w = updateSet(w, 'id2', 'dup', { weight: 60, reps: 10, drop: false });
+    expect(w.exercises[0]!.sets.at(-1)).toEqual({ id: 'dup', weight: 60, reps: 10 });
+    // From history, a drop set is not copied as one.
+    const fresh = addExercise(startWorkout(NOW, undefined, () => 'w2'), 'bench', () => 'e2');
+    const copied = duplicateLastSet(fresh, 'e2', [{ ...w, finishedAt: NOW.toISOString(), exercises: [{ ...w.exercises[0]!, sets: [{ id: 'h', weight: 70, reps: 9, drop: true }] }] }], () => 'c');
+    expect(copied.exercises[0]!.sets).toEqual([{ id: 'c', weight: 70, reps: 9 }]);
+  });
+});
+
+describe('supersets', () => {
+  function threeExercises() {
+    const newId = ids();
+    let w = startWorkout(NOW, undefined, newId); // id1
+    w = addExercise(w, 'a', newId); // id2
+    w = addExercise(w, 'b', newId); // id3
+    w = addExercise(w, 'c', newId); // id4
+    return w;
+  }
+
+  it('links an exercise with the next and cycles between them', () => {
+    let w = linkWithNext(threeExercises(), 'id2', () => 'x');
+    expect(supersetGroup(w, 'id2')).toEqual(['id2', 'id3']);
+    expect(supersetGroup(w, 'id4')).toEqual(['id4']);
+    expect(nextInSuperset(w, 'id2')).toBe('id3');
+    expect(nextInSuperset(w, 'id3')).toBe('id2');
+    expect(nextInSuperset(w, 'id4')).toBeNull();
+    // Extending to a tri-set keeps the same id.
+    w = linkWithNext(w, 'id3', () => 'y');
+    expect(supersetGroup(w, 'id4')).toEqual(['id2', 'id3', 'id4']);
+    expect(new Set(w.exercises.map((e) => e.supersetId))).toEqual(new Set(['ss-x']));
+    expect(nextInSuperset(w, 'id4')).toBe('id2');
+    // The last exercise has nothing after it.
+    expect(linkWithNext(threeExercises(), 'id4')).toEqual(threeExercises());
+  });
+
+  it('dissolves a superset left with a single exercise', () => {
+    let w = linkWithNext(threeExercises(), 'id2', () => 'x');
+    w = unlinkFromSuperset(w, 'id3');
+    expect(w.exercises.every((e) => e.supersetId === undefined)).toBe(true);
+    w = linkWithNext(threeExercises(), 'id2', () => 'x');
+    w = removeExercise(w, 'id2');
+    expect(w.exercises.every((e) => e.supersetId === undefined)).toBe(true);
+  });
+
+  it('keeps groups consistent when exercises move or empty ones are dropped on finish', () => {
+    let w = linkWithNext(threeExercises(), 'id2', () => 'x'); // [a b]+c
+    w = moveExercise(w, 'id4', -1); // a c b → a and b no longer adjacent
+    expect(w.exercises.every((e) => e.supersetId === undefined)).toBe(true);
+    let f = linkWithNext(threeExercises(), 'id2', () => 'x');
+    f = addSet(f, 'id2', { weight: 50, reps: 10 }, () => 's1');
+    f = addSet(f, 'id4', { weight: 50, reps: 10 }, () => 's2');
+    const done = finishWorkout(f, NOW);
+    expect(done.ok && done.workout.exercises.map((e) => e.supersetId)).toEqual([undefined, undefined]);
   });
 });
 

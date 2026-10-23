@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   formatDateHe,
   formatKg,
@@ -16,6 +16,8 @@ import {
   recentVolumes,
   recentlyUsedExerciseIds,
   sortWorkoutsNewestFirst,
+  personalRecordSetIds,
+  setOneRepMax,
   summarizeWorkout,
   weeklySummary,
 } from '../lib/stats';
@@ -28,6 +30,8 @@ import {
   startWorkoutFrom,
   startWorkoutWith,
   suggestNextExercises,
+  nextInSuperset,
+  supersetGroup,
 } from '../lib/workout';
 import { sortTemplates } from '../lib/templates';
 import { useApp } from '../state/AppContext';
@@ -562,6 +566,31 @@ function WorkoutEditor({ workout, mode, history, onChange }: EditorProps) {
   const selected = workout.exercises.find((e) => e.id === selectedId) ?? workout.exercises.at(-1);
   const updateActive = onChange;
 
+  // Celebrate a personal record the moment its set is added (while training).
+  const records = useMemo(() => personalRecordSetIds([...history, workout]), [history, workout]);
+  const knownSetIds = useRef(new Set(workout.exercises.flatMap((e) => e.sets.map((s) => s.id))));
+  const [celebration, setCelebration] = useState<string | null>(null);
+  const clearCelebration = useCallback(() => setCelebration(null), []);
+  useEffect(() => {
+    const all = workout.exercises.flatMap((e) => e.sets);
+    if (!editing) {
+      const record = all.find((s) => !knownSetIds.current.has(s.id) && records.has(s.id));
+      if (record) {
+        setCelebration(`שיא חדש! 1RM משוער ${formatKg(setOneRepMax(record))} ק"ג`);
+        // Browsers refuse (and log) vibration before any real tap on the page.
+        const activation = (navigator as Navigator & { userActivation?: { hasBeenActive: boolean } }).userActivation;
+        if (activation?.hasBeenActive) navigator.vibrate?.([30, 60, 30]);
+      }
+    }
+    knownSetIds.current = new Set(all.map((s) => s.id));
+  }, [workout, records, editing]);
+
+  /** After a set in a superset, move on to the group's next exercise. */
+  const afterSet = (entryId: string) => {
+    const next = nextInSuperset(workout, entryId);
+    if (next) setSelectedId(next);
+  };
+
   /** Adds exercises in order and selects the first one added. */
   const addExercises = (exerciseIds: string[]) => {
     const entryIds = exerciseIds.map(() => createId());
@@ -710,6 +739,11 @@ function WorkoutEditor({ workout, mode, history, onChange }: EditorProps) {
               onClick={() => setSelectedId(e.id)}
             >
               {e.sets.length > 0 && !on && <span className="chip__dot" aria-hidden="true" />}
+              {e.supersetId && supersetGroup(workout, e.id).length > 1 && (
+                <span role="img" aria-label="סופר-סט" style={{ display: 'inline-flex' }}>
+                  <Icon name="link" size={15} />
+                </span>
+              )}
               {exerciseById.get(e.exerciseId)?.nameHe ?? 'תרגיל לא מוכר'}
             </button>
           );
@@ -726,6 +760,7 @@ function WorkoutEditor({ workout, mode, history, onChange }: EditorProps) {
           history={history}
           onChange={onChange}
           onRemoved={() => setSelectedId(null)}
+          onSetAdded={afterSet}
         />
       ) : editing ? (
         <EmptyState title="אין תרגילים באימון">
@@ -769,6 +804,8 @@ function WorkoutEditor({ workout, mode, history, onChange }: EditorProps) {
           </button>
         </div>
       )}
+
+      {celebration && <Toast message={celebration} onDone={clearCelebration} />}
 
       {picking && (
         <ExercisePicker

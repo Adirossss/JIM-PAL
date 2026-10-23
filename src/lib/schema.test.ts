@@ -12,7 +12,10 @@ import {
 
 function sampleData(): AppData {
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
+    bodyEntries: [
+      { id: 'b1', date: '2026-10-20', weight: 81.4, waist: 84, chest: null, arm: 36.5, note: '' },
+    ],
     favoriteExerciseIds: ['pull-up', 'custom-zercher'],
     templates: [
       { id: 't1', name: 'יום חזה', exerciseIds: ['barbell-bench-press', 'pull-up'], createdAt: '2026-10-21T08:00:00.000Z' },
@@ -24,10 +27,10 @@ function sampleData(): AppData {
     workouts: [
       { id: 'w1', date: '2026-10-20', startedAt: '2026-10-20T15:00:00.000Z', finishedAt: '2026-10-20T16:10:00.000Z',
         note: 'good session', exercises: [
-          { id: 'e1', exerciseId: 'barbell-bench-press', note: '', sets: [
-            { id: 's1', weight: 80, reps: 8 }, { id: 's2', weight: 82.5, reps: 6 },
+          { id: 'e1', exerciseId: 'barbell-bench-press', note: '', supersetId: 'ss1', sets: [
+            { id: 's1', weight: 80, reps: 8 }, { id: 's2', weight: 82.5, reps: 6 }, { id: 's2d', weight: 60, reps: 10, drop: true },
           ] },
-          { id: 'e2', exerciseId: 'pull-up', note: 'strict', sets: [{ id: 's3', weight: null, reps: 10 }] },
+          { id: 'e2', exerciseId: 'pull-up', note: 'strict', supersetId: 'ss1', sets: [{ id: 's3', weight: null, reps: 10 }] },
         ] },
     ],
     activeWorkout: {
@@ -68,7 +71,14 @@ describe('validateAppData', () => {
     ['empty exercise name', (d) => { d.customExercises[0]!.nameHe = '  '; }],
     ['duplicate workout id', (d) => { d.activeWorkout!.id = 'w1'; }],
     ['custom id clashing with seed', (d) => { d.customExercises[0]!.id = 'deadlift'; }],
-    ['wrong schema version', (d) => { d.schemaVersion = 1; }],
+    ['wrong schema version', (d) => { d.schemaVersion = 2; }],
+    ['drop flag not boolean', (d) => { (d.workouts[0]!.exercises[0]!.sets[0] as unknown as Record<string, unknown>).drop = 'yes'; }],
+    ['empty superset id', (d) => { d.workouts[0]!.exercises[0]!.supersetId = ' '; }],
+    ['missing body entries', (d) => { delete (d as Partial<AppData>).bodyEntries; }],
+    ['body entry without values', (d) => { d.bodyEntries[0] = { ...d.bodyEntries[0]!, weight: null, waist: null, arm: null }; }],
+    ['body weight out of range', (d) => { d.bodyEntries[0]!.weight = 4; }],
+    ['body entry with bad date', (d) => { d.bodyEntries[0]!.date = '2026-13-01'; }],
+    ['duplicate body entry id', (d) => { d.bodyEntries.push({ ...d.bodyEntries[0]! }); }],
     ['favorites not a list', (d) => { (d as unknown as Record<string, unknown>).favoriteExerciseIds = 'pull-up'; }],
     ['duplicate favorite', (d) => { d.favoriteExerciseIds = ['pull-up', 'pull-up']; }],
     ['missing templates', (d) => { delete (d as Partial<AppData>).templates; }],
@@ -101,15 +111,31 @@ describe('migrateAppData', () => {
     expect(migrateAppData(sampleData())).toEqual({ ok: true, value: sampleData() });
   });
 
-  it('upgrades version 1 data to version 2 without changing anything existing', () => {
-    const { favoriteExerciseIds: _f, templates: _t, ...rest } = sampleData();
+  it('upgrades version 1 data to the current version without changing anything existing', () => {
+    const { favoriteExerciseIds: _f, templates: _t, bodyEntries: _b, ...rest } = sampleData();
     const v1 = { ...rest, schemaVersion: 1 };
     const r = migrateAppData(v1);
     expect(r.ok).toBe(true);
     if (!r.ok) return;
-    expect(r.value).toEqual({ ...rest, schemaVersion: 2, favoriteExerciseIds: [], templates: [] });
+    expect(r.value).toEqual({ ...rest, schemaVersion: 3, favoriteExerciseIds: [], templates: [], bodyEntries: [] });
     // A v1 backup file still imports.
     expect(parseImport(JSON.stringify({ app: 'jim-pal', exportedAt: '2026-10-20T00:00:00.000Z', ...v1 })).ok).toBe(true);
+  });
+
+  it('upgrades version 2 data (favorites and templates kept) to version 3', () => {
+    const { bodyEntries: _b, ...rest } = sampleData();
+    const r = migrateAppData({ ...rest, schemaVersion: 2 });
+    expect(r).toEqual({ ok: true, value: { ...rest, schemaVersion: 3, bodyEntries: [] } });
+  });
+
+  it('keeps drop and superset fields only when set', () => {
+    const d = sampleData();
+    (d.workouts[0]!.exercises[1]!.sets[0] as unknown as Record<string, unknown>).drop = false;
+    const r = validateAppData(d);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect('drop' in r.value.workouts[0]!.exercises[1]!.sets[0]!).toBe(false);
+    expect('supersetId' in r.value.activeWorkout!.exercises[0]!).toBe(false);
   });
 
   it('refuses missing, invalid or newer versions', () => {

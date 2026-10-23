@@ -46,6 +46,25 @@ export interface WorkoutExercise {
   exerciseId: string;
   note: string;
   sets: SetEntry[];
+  /**
+   * Consecutive exercises sharing this id form a superset, done back to back
+   * without rest (schema v3). Absent = not in a superset.
+   */
+  supersetId?: string;
+}
+
+/** A body-weight / measurements entry (schema v3). At least one value is set. */
+export interface BodyEntry {
+  id: string;
+  /** Local calendar date, YYYY-MM-DD. */
+  date: string;
+  /** Body weight in kg. */
+  weight: number | null;
+  /** Circumferences in cm. */
+  waist: number | null;
+  chest: number | null;
+  arm: number | null;
+  note: string;
 }
 
 export interface Workout {
@@ -81,6 +100,8 @@ export interface AppData {
   favoriteExerciseIds: string[];
   /** Saved workout templates (schema v2). */
   templates: WorkoutTemplate[];
+  /** Body weight and measurements, any order (schema v3). */
+  bodyEntries: BodyEntry[];
 }
 
 export const MUSCLE_LABELS_HE: Record<MuscleGroup, string> = {

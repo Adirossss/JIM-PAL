@@ -1,5 +1,6 @@
 import { formatDateHe, formatKg, formatTotal, weekdayHe } from '../lib/format';
 import { bestSet, personalRecordSetIds, setOneRepMax, summarizeWorkout, totalVolume } from '../lib/stats';
+import { supersetGroup } from '../lib/workout';
 import { useState } from 'react';
 import { createId } from '../lib/ids';
 import { MAX_TEMPLATE_NAME } from '../lib/schema';
@@ -106,6 +107,7 @@ export function WorkoutDetail({ workoutId }: { workoutId: string }) {
           key={entry.id}
           entry={entry}
           records={records}
+          superset={supersetGroup(workout, entry.id).length > 1}
           onOpen={() => navigate({ name: 'exerciseDetail', exerciseId: entry.exerciseId })}
         />
       ))}
@@ -143,10 +145,12 @@ export function Stat({ label, value, sub }: { label: string; value: string; sub?
 function EntrySummary({
   entry,
   records,
+  superset,
   onOpen,
 }: {
   entry: WorkoutExercise;
   records: ReadonlySet<string>;
+  superset: boolean;
   onOpen: () => void;
 }) {
   const { exercise } = useExercise(entry.exerciseId);
@@ -159,7 +163,10 @@ function EntrySummary({
       <div className="entry__head">
         <div className="stack" style={{ gap: 6 }}>
           <ExerciseTitle exercise={exercise} />
-          <ExerciseTags exercise={exercise} />
+          <span className="row" style={{ gap: 4 }}>
+            <ExerciseTags exercise={exercise} />
+            {superset && <span className="tag tag--accent">סופר-סט</span>}
+          </span>
         </div>
         <button type="button" className="icon-btn icon-btn--panel" aria-label={`התקדמות ב${exercise.nameHe}`} onClick={onOpen}>
           <Icon name="chart" />
@@ -180,6 +187,7 @@ function EntrySummary({
               <td>
                 {i + 1}
                 {set === best && ' ★'}
+                {set.drop && <span className="tag" style={{ marginInlineStart: 4 }}>דרופ</span>}
                 {records.has(set.id) && (
                   <span className="pr-mark" role="img" aria-label="שיא חדש">
                     <Icon name="trophy" size={15} />
