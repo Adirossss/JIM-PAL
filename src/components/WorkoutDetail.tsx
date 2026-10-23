@@ -69,7 +69,21 @@ export function WorkoutDetail({ workoutId }: { workoutId: string }) {
 
   return (
     <div className="stack">
-      <ScreenHeader start={back} title={formatDateHe(workout.date)} subtitle={weekdayHe(workout.date)} />
+      <ScreenHeader
+        start={back}
+        title={formatDateHe(workout.date)}
+        subtitle={weekdayHe(workout.date)}
+        end={
+          <button
+            type="button"
+            className="icon-btn"
+            aria-label="ערוך אימון"
+            onClick={() => navigate({ name: 'workoutEdit', workoutId: workout.id })}
+          >
+            <Icon name="note" />
+          </button>
+        }
+      />
 
       <section className="card card--tight">
         <div className="panel">

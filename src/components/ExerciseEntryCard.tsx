@@ -14,6 +14,7 @@ import {
   stepWeight,
   updateSet,
   validateSetInput,
+  type SetValues,
 } from '../lib/workout';
 import { useApp } from '../state/AppContext';
 import { useConfirm } from '../state/confirm';
@@ -26,14 +27,17 @@ interface Props {
   workout: Workout;
   entry: WorkoutExercise;
   index: number;
+  /** Finished workouts other than the one being edited (pre-fill and "last time" come from these). */
+  history: readonly Workout[];
+  /** Applies a change to the workout being edited (the active one, or a finished one). */
+  onChange: (fn: (workout: Workout) => Workout) => void;
   onRemoved: () => void;
 }
 
-export function ExerciseEntryCard({ workout, entry, index, onRemoved }: Props) {
-  const { data, updateActive, navigate } = useApp();
+export function ExerciseEntryCard({ workout, entry, index, history, onChange, onRemoved }: Props) {
+  const { navigate } = useApp();
   const confirm = useConfirm();
   const { exercise } = useExercise(entry.exerciseId);
-  const history = data.workouts;
   const formId = useId();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showNote, setShowNote] = useState(entry.note !== '');
@@ -54,7 +58,7 @@ export function ExerciseEntryCard({ workout, entry, index, onRemoved }: Props) {
     ) {
       return;
     }
-    updateActive((w) => removeExercise(w, entry.id));
+    onChange((w) => removeExercise(w, entry.id));
     onRemoved();
   };
 
@@ -118,7 +122,7 @@ export function ExerciseEntryCard({ workout, entry, index, onRemoved }: Props) {
           number={entry.sets.indexOf(editing) + 1}
           equipment={exercise.equipment}
           onSave={(values) => {
-            updateActive((w) => updateSet(w, entry.id, editing.id, values));
+            onChange((w) => updateSet(w, entry.id, editing.id, values));
             setEditingId(null);
           }}
           onDelete={async () => {
@@ -129,7 +133,7 @@ export function ExerciseEntryCard({ workout, entry, index, onRemoved }: Props) {
               danger: true,
             });
             if (!ok) return;
-            updateActive((w) => deleteSet(w, entry.id, editing.id));
+            onChange((w) => deleteSet(w, entry.id, editing.id));
             setEditingId(null);
           }}
           onCancel={() => setEditingId(null)}
@@ -137,9 +141,9 @@ export function ExerciseEntryCard({ workout, entry, index, onRemoved }: Props) {
       ) : (
         <NewSetForm
           id={formId}
-          entryId={entry.id}
           equipment={exercise.equipment}
           initial={setToInputText(lastLoggedSet(entry.exerciseId, workout, history))}
+          onAdd={(values) => onChange((w) => addSet(w, entry.id, values))}
         />
       )}
 
@@ -150,7 +154,7 @@ export function ExerciseEntryCard({ workout, entry, index, onRemoved }: Props) {
             className="input"
             placeholder="אחיזה, תחושה, מה לשנות בפעם הבאה…"
             value={entry.note}
-            onChange={(e) => updateActive((w) => setExerciseNote(w, entry.id, e.target.value))}
+            onChange={(e) => onChange((w) => setExerciseNote(w, entry.id, e.target.value))}
             rows={2}
           />
         </label>
@@ -166,7 +170,7 @@ export function ExerciseEntryCard({ workout, entry, index, onRemoved }: Props) {
         <button
           type="button"
           className="icon-btn icon-btn--panel"
-          onClick={() => updateActive((w) => moveExercise(w, entry.id, -1))}
+          onClick={() => onChange((w) => moveExercise(w, entry.id, -1))}
           disabled={index <= 0}
           aria-label="הזז את התרגיל קודם"
         >
@@ -175,7 +179,7 @@ export function ExerciseEntryCard({ workout, entry, index, onRemoved }: Props) {
         <button
           type="button"
           className="icon-btn icon-btn--panel"
-          onClick={() => updateActive((w) => moveExercise(w, entry.id, 1))}
+          onClick={() => onChange((w) => moveExercise(w, entry.id, 1))}
           disabled={index >= workout.exercises.length - 1}
           aria-label="הזז את התרגיל אחר כך"
         >
@@ -191,7 +195,7 @@ export function ExerciseEntryCard({ workout, entry, index, onRemoved }: Props) {
           <button
             type="button"
             className="btn btn--secondary btn--large"
-            onClick={() => updateActive((w) => duplicateLastSet(w, entry.id, history))}
+            onClick={() => onChange((w) => duplicateLastSet(w, entry.id, history))}
             disabled={!canDuplicate}
           >
             שכפל סט אחרון
@@ -276,16 +280,15 @@ function SetSteppers({
 
 function NewSetForm({
   id,
-  entryId,
   equipment,
   initial,
+  onAdd,
 }: {
   id: string;
-  entryId: string;
   equipment: EquipmentType;
   initial: { weight: string; reps: string };
+  onAdd: (values: SetValues) => void;
 }) {
-  const { updateActive } = useApp();
   // Pre-filled once from the last logged set; afterwards it keeps what the
   // user typed, which after "add" equals the set just logged.
   const [weight, setWeight] = useState(initial.weight);
@@ -300,7 +303,7 @@ function NewSetForm({
       return;
     }
     setError(null);
-    updateActive((w) => addSet(w, entryId, result.values));
+    onAdd(result.values);
   };
 
   return (

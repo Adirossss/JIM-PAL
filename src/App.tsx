@@ -8,7 +8,8 @@ import { ExerciseDetail } from './components/ExerciseDetail';
 import { ExercisesScreen, NewExerciseScreen } from './components/ExercisesScreen';
 import { HistoryScreen } from './components/HistoryScreen';
 import { WorkoutDetail } from './components/WorkoutDetail';
-import { WorkoutScreen } from './components/WorkoutScreen';
+import { EditWorkout, WorkoutScreen } from './components/WorkoutScreen';
+import { BodyScreen } from './components/BodyScreen';
 
 export function App({ initial }: { initial: InitialState }) {
   return (
@@ -49,6 +50,10 @@ function Screen({ route }: { route: Route }) {
       return <HistoryScreen />;
     case 'workoutDetail':
       return <WorkoutDetail workoutId={route.workoutId} />;
+    case 'workoutEdit':
+      return <EditWorkout workoutId={route.workoutId} />;
+    case 'body':
+      return <BodyScreen />;
     case 'exercises':
       return <ExercisesScreen />;
     case 'exerciseDetail':

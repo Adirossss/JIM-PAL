@@ -402,23 +402,81 @@ export function WorkoutHeadline({ workout }: { workout: Workout }) {
 }
 
 function ActiveWorkout({ workout }: { workout: Workout }) {
-  const { update, updateActive, navigate, exerciseById } = useApp();
+  const { data, updateActive } = useApp();
+  return <WorkoutEditor workout={workout} mode="active" history={data.workouts} onChange={updateActive} />;
+}
+
+/** Edits a finished workout with the same screen used while training. */
+export function EditWorkout({ workoutId }: { workoutId: string }) {
+  const { data, update } = useApp();
+  const workout = data.workouts.find((w) => w.id === workoutId);
+  const history = useMemo(() => data.workouts.filter((w) => w.id !== workoutId), [data.workouts, workoutId]);
+  if (!workout) {
+    return (
+      <div className="stack">
+        <EmptyState title="האימון לא נמצא" />
+      </div>
+    );
+  }
+  return (
+    <WorkoutEditor
+      workout={workout}
+      mode="edit"
+      history={history}
+      onChange={(fn) => update((d) => ({ ...d, workouts: d.workouts.map((w) => (w.id === workoutId ? fn(w) : w)) }))}
+    />
+  );
+}
+
+interface EditorProps {
+  workout: Workout;
+  /** "active": the workout in progress. "edit": a finished workout from history. */
+  mode: 'active' | 'edit';
+  /** Finished workouts other than this one. */
+  history: readonly Workout[];
+  onChange: (fn: (workout: Workout) => Workout) => void;
+}
+
+function WorkoutEditor({ workout, mode, history, onChange }: EditorProps) {
+  const { update, navigate, goBack, exerciseById } = useApp();
   const confirm = useConfirm();
+  const editing = mode === 'edit';
   const [picking, setPicking] = useState(false);
-  const [showDetails, setShowDetails] = useState(false);
+  const [showDetails, setShowDetails] = useState(editing);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const addedIds = useMemo(() => new Set(workout.exercises.map((e) => e.exerciseId)), [workout.exercises]);
   const summary = summarizeWorkout(workout);
   // The chosen exercise, else the most recently added one.
   const selected = workout.exercises.find((e) => e.id === selectedId) ?? workout.exercises.at(-1);
+  const updateActive = onChange;
 
   /** Adds exercises in order and selects the first one added. */
   const addExercises = (exerciseIds: string[]) => {
     const entryIds = exerciseIds.map(() => createId());
     setError(null);
-    updateActive((w) => exerciseIds.reduce((acc, id, i) => addExercise(acc, id, () => entryIds[i]!), w));
+    onChange((w) => exerciseIds.reduce((acc, id, i) => addExercise(acc, id, () => entryIds[i]!), w));
     if (entryIds[0]) setSelectedId(entryIds[0]);
+  };
+
+  /** Leaves edit mode: exercises left without sets are dropped; an emptied workout can be deleted. */
+  const doneEditing = async () => {
+    const kept = workout.exercises.filter((e) => e.sets.length > 0);
+    if (kept.length === 0) {
+      const ok = await confirm({
+        title: 'לא נשארו סטים באימון',
+        message: 'למחוק את האימון מההיסטוריה?',
+        confirmLabel: 'מחק אימון',
+        cancelLabel: 'המשך לערוך',
+        danger: true,
+      });
+      if (!ok) return;
+      update((d) => ({ ...d, workouts: d.workouts.filter((w) => w.id !== workout.id) }));
+      navigate({ name: 'history' }, { replace: true });
+      return;
+    }
+    if (kept.length !== workout.exercises.length) onChange((w) => ({ ...w, exercises: kept }));
+    goBack({ name: 'workoutDetail', workoutId: workout.id });
   };
 
   // Keep the selected chip visible in the horizontally scrolling row.
@@ -475,13 +533,20 @@ function ActiveWorkout({ workout }: { workout: Workout }) {
             <Icon name="note" />
           </button>
         }
-        title="אימון פעיל"
+        title={editing ? 'עריכת אימון' : 'אימון פעיל'}
         subtitle={`${summary.setCount} סטים · נפח ${formatTotal(summary.volume)} ק"ג`}
         end={
-          <button type="button" className="btn btn--primary btn--small" onClick={finish}>
-            <Icon name="check" size={16} />
-            סיים
-          </button>
+          editing ? (
+            <button type="button" className="btn btn--primary btn--small" onClick={doneEditing}>
+              <Icon name="check" size={16} />
+              סיום
+            </button>
+          ) : (
+            <button type="button" className="btn btn--primary btn--small" onClick={finish}>
+              <Icon name="check" size={16} />
+              סיים
+            </button>
+          )
         }
       />
 
@@ -491,7 +556,7 @@ function ActiveWorkout({ workout }: { workout: Workout }) {
             <div className="field">
               <span className="field__label">תאריך</span>
               <DateField
-                label="תאריך האימון הפעיל"
+                label={editing ? 'תאריך האימון' : 'תאריך האימון הפעיל'}
                 value={workout.date}
                 onChange={(value) => {
                   if (isValidDateString(value)) updateActive((w) => setWorkoutDate(w, value));
@@ -546,8 +611,17 @@ function ActiveWorkout({ workout }: { workout: Workout }) {
           workout={workout}
           entry={selected}
           index={workout.exercises.indexOf(selected)}
+          history={history}
+          onChange={onChange}
           onRemoved={() => setSelectedId(null)}
         />
+      ) : editing ? (
+        <EmptyState title="אין תרגילים באימון">
+          <button type="button" className="btn btn--primary" onClick={() => setPicking(true)}>
+            <Icon name="plus" size={18} />
+            הוסף תרגיל
+          </button>
+        </EmptyState>
       ) : (
         <>
           <EmptyState title="עוד לא הוספת תרגילים">
@@ -574,13 +648,15 @@ function ActiveWorkout({ workout }: { workout: Workout }) {
         </>
       )}
 
-      <SuggestionsCard workout={workout} onAdd={addExercises} />
+      {!editing && <SuggestionsCard workout={workout} onAdd={addExercises} />}
 
-      <div className="finish-bar">
-        <button type="button" className="btn btn--ghost btn--danger" onClick={discard}>
-          בטל אימון
-        </button>
-      </div>
+      {!editing && (
+        <div className="finish-bar">
+          <button type="button" className="btn btn--ghost btn--danger" onClick={discard}>
+            בטל אימון
+          </button>
+        </div>
+      )}
 
       {picking && (
         <ExercisePicker

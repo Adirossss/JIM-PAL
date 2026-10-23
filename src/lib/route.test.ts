@@ -6,6 +6,8 @@ describe('routes', () => {
     { name: 'workout' },
     { name: 'history' },
     { name: 'workoutDetail', workoutId: 'abc123' },
+    { name: 'workoutEdit', workoutId: 'abc123' },
+    { name: 'body' },
     { name: 'exercises' },
     { name: 'exerciseDetail', exerciseId: 'leg-press' },
     { name: 'exerciseDetail', exerciseId: 'id with/slash' },
@@ -30,6 +32,8 @@ describe('routes', () => {
   it('maps routes to tabs', () => {
     expect(tabOf({ name: 'workoutDetail', workoutId: 'x' })).toBe('history');
     expect(tabOf({ name: 'newExercise' })).toBe('exercises');
+    expect(tabOf({ name: 'workoutEdit', workoutId: 'x' })).toBe('history');
+    expect(tabOf({ name: 'body' })).toBe('workout');
     expect(tabOf({ name: 'data' })).toBe('data');
   });
 });
