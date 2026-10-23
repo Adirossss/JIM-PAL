@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { formatDateHe, formatKg, formatTotal, weekdayHe } from '../lib/format';
-import { exerciseStats, oneRepMaxProgress, percentChange, setOneRepMax } from '../lib/stats';
+import { exerciseStats, oneRepMaxProgress, percentChange, personalRecordSetIds, setOneRepMax } from '../lib/stats';
 import { addExercise, startWorkout } from '../lib/workout';
 import { useApp } from '../state/AppContext';
 import { MUSCLE_LABELS_HE } from '../types';
@@ -10,6 +10,7 @@ import {
   ExerciseTags,
   ExerciseTitle,
   FavoriteButton,
+  Icon,
   ScreenHeader,
   SetText,
   formatSet,
@@ -22,6 +23,8 @@ export function ExerciseDetail({ exerciseId }: { exerciseId: string }) {
   const { exercise, known } = useExercise(exerciseId);
   const stats = useMemo(() => exerciseStats(data.workouts, exerciseId), [data.workouts, exerciseId]);
   const progress = useMemo(() => oneRepMaxProgress(data.workouts, exerciseId), [data.workouts, exerciseId]);
+  const records = useMemo(() => personalRecordSetIds(data.workouts), [data.workouts]);
+  const recordCount = stats.sessions.reduce((n, s) => n + s.sets.filter((set) => records.has(set.id)).length, 0);
   const inActive = data.activeWorkout?.exercises.some((e) => e.exerciseId === exerciseId) ?? false;
   const best = stats.bestSet;
   const bestOneRepMax = best ? setOneRepMax(best) : 0;
@@ -107,6 +110,10 @@ export function ExerciseDetail({ exerciseId }: { exerciseId: string }) {
                 <span>סטים</span>
                 <span>{stats.totalSets}</span>
               </div>
+              <div className="kv">
+                <span>שיאים שנשברו</span>
+                <span>{recordCount}</span>
+              </div>
               {improvement !== null && (
                 <div className="kv">
                   <span>שינוי ב-1RM מהאימון הראשון</span>
@@ -141,6 +148,11 @@ export function ExerciseDetail({ exerciseId }: { exerciseId: string }) {
                       {s.sets.map((set) => (
                         <span key={set.id} className={`set-chip ${set === s.bestSet ? 'set-chip--best' : ''}`}>
                           <SetText set={set} equipment={exercise.equipment} />
+                          {records.has(set.id) && (
+                            <span className="pr-mark" role="img" aria-label="שיא חדש">
+                              <Icon name="trophy" size={13} />
+                            </span>
+                          )}
                         </span>
                       ))}
                     </span>

@@ -1,6 +1,6 @@
-import { useId, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type FormEvent } from 'react';
 import { formatDateHe, formatKg } from '../lib/format';
-import { exerciseSessions } from '../lib/stats';
+import { exerciseSessions, personalRecordSetIds, setOneRepMax } from '../lib/stats';
 import {
   addSet,
   deleteSet,
@@ -12,6 +12,7 @@ import {
   setToInputText,
   stepReps,
   stepWeight,
+  suggestNextSet,
   updateSet,
   validateSetInput,
   type SetValues,
@@ -19,7 +20,7 @@ import {
 import { useApp } from '../state/AppContext';
 import { useConfirm } from '../state/confirm';
 import type { EquipmentType, SetEntry, Workout, WorkoutExercise } from '../types';
-import { ExerciseTags, ExerciseTitle, Icon, formatSet, useExercise } from './common';
+import { ExerciseTags, ExerciseTitle, Icon, Toast, formatSet, useExercise } from './common';
 
 const WEIGHT_STEP_KG = 2.5;
 
@@ -27,6 +28,8 @@ interface Props {
   workout: Workout;
   entry: WorkoutExercise;
   index: number;
+  /** Show today's weight recommendation (only while training, not when editing history). */
+  suggest?: boolean;
   /** Finished workouts other than the one being edited (pre-fill and "last time" come from these). */
   history: readonly Workout[];
   /** Applies a change to the workout being edited (the active one, or a finished one). */
@@ -34,10 +37,31 @@ interface Props {
   onRemoved: () => void;
 }
 
-export function ExerciseEntryCard({ workout, entry, index, history, onChange, onRemoved }: Props) {
+export function ExerciseEntryCard({ workout, entry, index, suggest = false, history, onChange, onRemoved }: Props) {
   const { navigate } = useApp();
   const confirm = useConfirm();
   const { exercise } = useExercise(entry.exerciseId);
+
+  // Personal records: celebrate a set the moment it is added and beats the best so far.
+  const records = useMemo(() => personalRecordSetIds([...history, workout]), [history, workout]);
+  const [celebration, setCelebration] = useState<string | null>(null);
+  const clearCelebration = useCallback(() => setCelebration(null), []);
+  const knownSetIds = useRef(new Set(entry.sets.map((s) => s.id)));
+  useEffect(() => {
+    for (const s of entry.sets) {
+      if (!knownSetIds.current.has(s.id) && records.has(s.id)) {
+        setCelebration(`שיא חדש! 1RM משוער ${formatKg(setOneRepMax(s))} ק"ג`);
+        // Browsers refuse (and log) vibration before any real tap on the page.
+        const activation = (navigator as Navigator & { userActivation?: { hasBeenActive: boolean } }).userActivation;
+        if (activation?.hasBeenActive) navigator.vibrate?.([30, 60, 30]);
+      }
+    }
+    knownSetIds.current = new Set(entry.sets.map((s) => s.id));
+  }, [entry.sets, records]);
+
+  // Today's recommendation (before the first set); "השתמש" re-seeds the set form.
+  const nextSet = suggest && entry.sets.length === 0 ? suggestNextSet(entry.exerciseId, history, exercise.equipment) : null;
+  const [seed, setSeed] = useState<{ weight: string; reps: string; version: number } | null>(null);
   const formId = useId();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showNote, setShowNote] = useState(entry.note !== '');
@@ -83,12 +107,43 @@ export function ExerciseEntryCard({ workout, entry, index, history, onChange, on
         <p className="entry__previous">
           בפעם הקודמת ({formatDateHe(previous.date)}):{' '}
           {previous.sets.map((s, i) => (
-            <span key={s.id} style={{ whiteSpace: 'nowrap' }}>
+            <span key={s.id}>
               {i > 0 && ' · '}
-              <bdi>{formatSet(s, exercise.equipment)}</bdi>
+              <bdi style={{ whiteSpace: 'nowrap' }}>{formatSet(s, exercise.equipment)}</bdi>
             </span>
           ))}
         </p>
+      )}
+
+      {nextSet && (
+        <div className="suggest-set">
+          <span className="suggest-set__icon" aria-hidden="true">
+            <Icon name="trend" />
+          </span>
+          <span className="suggest-set__text">
+            <strong>
+              המלצה להיום: <bdi>{formatSet({ id: '', weight: nextSet.weight, reps: nextSet.reps }, exercise.equipment)}</bdi>
+            </strong>
+            <span>
+              {nextSet.kind === 'increase'
+                ? `בפעם הקודמת החזקת ${nextSet.basis.sets} סטים ב-${formatSet({ id: '', weight: nextSet.basis.weight, reps: nextSet.basis.reps }, exercise.equipment)}. הגיע הזמן להעלות.`
+                : `בפעם הקודמת: ${formatSet({ id: '', weight: nextSet.basis.weight, reps: nextSet.basis.reps }, exercise.equipment)}. נסה חזרה אחת יותר.`}
+            </span>
+          </span>
+          <button
+            type="button"
+            className="btn btn--secondary btn--small"
+            onClick={() =>
+              setSeed((prev) => ({
+                weight: nextSet.weight === null ? '' : String(nextSet.weight),
+                reps: String(nextSet.reps),
+                version: (prev?.version ?? 0) + 1,
+              }))
+            }
+          >
+            השתמש
+          </button>
+        </div>
       )}
 
       <div className="stack" style={{ gap: 8 }}>
@@ -100,11 +155,16 @@ export function ExerciseEntryCard({ workout, entry, index, history, onChange, on
               type="button"
               className={`set-circle ${s.id === editingId ? 'set-circle--on' : ''}`}
               aria-pressed={s.id === editingId}
-              aria-label={`סט ${i + 1}: ${formatSet(s, exercise.equipment)}. לחץ לעריכה`}
+              aria-label={`סט ${i + 1}: ${formatSet(s, exercise.equipment)}${records.has(s.id) ? ' (שיא)' : ''}. לחץ לעריכה`}
               onClick={() => setEditingId(s.id === editingId ? null : s.id)}
             >
               <b dir="ltr">{circleWeight(s, exercise.equipment)}</b>
               <span>× {s.reps}</span>
+              {records.has(s.id) && (
+                <span className="set-circle__badge" aria-hidden="true">
+                  <Icon name="trophy" size={13} />
+                </span>
+              )}
             </button>
           ))}
           {!editing && (
@@ -140,9 +200,10 @@ export function ExerciseEntryCard({ workout, entry, index, history, onChange, on
         />
       ) : (
         <NewSetForm
+          key={seed?.version ?? 0}
           id={formId}
           equipment={exercise.equipment}
-          initial={setToInputText(lastLoggedSet(entry.exerciseId, workout, history))}
+          initial={seed ?? setToInputText(lastLoggedSet(entry.exerciseId, workout, history))}
           onAdd={(values) => onChange((w) => addSet(w, entry.id, values))}
         />
       )}
@@ -205,6 +266,7 @@ export function ExerciseEntryCard({ workout, entry, index, history, onChange, on
           </button>
         </div>
       )}
+      {celebration && <Toast message={celebration} onDone={clearCelebration} />}
     </section>
   );
 }

@@ -43,6 +43,8 @@ const ICON_PATHS = {
   plus: 'M12 5v14M5 12h14',
   check: 'M5 12l5 5 9-10',
   star: 'M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.8-5.2 2.8 1-5.8-4.3-4.1 5.9-.9z',
+  trophy: 'M8 4h8v5a4 4 0 0 1-8 0V4zM8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13v4M8 20h8M10 17h4',
+  trend: 'M4 16l6-6 4 4 6-7M15 7h5v5',
   bookmark: 'M7 4h10v16l-5-3.5L7 20z',
 } as const;
 
@@ -250,6 +252,23 @@ export function Modal({ title, onClose, children }: { title: string; onClose: ()
         </div>
         <div className="modal__body">{children}</div>
       </div>
+    </div>,
+    document.body,
+  );
+}
+
+/** Short-lived message at the top of the screen (e.g. a new personal record). */
+export function Toast({ message, icon = 'trophy', onDone }: { message: string; icon?: IconName; onDone: () => void }) {
+  useEffect(() => {
+    const timer = window.setTimeout(onDone, 3500);
+    return () => window.clearTimeout(timer);
+  }, [message, onDone]);
+  return createPortal(
+    <div className="toast" role="status" aria-live="polite">
+      <span className="toast__icon" aria-hidden="true">
+        <Icon name={icon} size={22} />
+      </span>
+      <span>{message}</span>
     </div>,
     document.body,
   );

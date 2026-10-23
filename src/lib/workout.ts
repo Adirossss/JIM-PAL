@@ -238,6 +238,51 @@ export function stepReps(text: string, delta: number): string {
   return String(Math.min(MAX_REPS, Math.max(1, base + delta)));
 }
 
+export interface NextSetSuggestion {
+  weight: number | null;
+  reps: number;
+  /** "increase": add weight. "add-rep": same weight, one more rep. */
+  kind: 'increase' | 'add-rep';
+  /** The top-weight sets of last time the suggestion is based on. */
+  basis: { weight: number | null; reps: number; sets: number; date: string };
+}
+
+/**
+ * Progressive overload from the most recent session of the exercise
+ * (drop sets ignored): if at least two sets at the top weight all held the
+ * same reps, add `step` kg (bodyweight with no added load: add a rep);
+ * otherwise keep the weight and aim for one rep more than the weakest of them.
+ */
+export function suggestNextSet(
+  exerciseId: string,
+  history: readonly Workout[],
+  equipment: EquipmentType,
+  step = 2.5,
+): NextSetSuggestion | null {
+  for (const w of sortWorkoutsNewestFirst(history)) {
+    const sets = w.exercises
+      .filter((e) => e.exerciseId === exerciseId)
+      .flatMap((e) => e.sets)
+      .filter((s) => !s.drop && s.reps > 0);
+    if (sets.length === 0) continue;
+
+    const load = (s: SetEntry) => s.weight ?? 0;
+    const top = Math.max(...sets.map(load));
+    const atTop = sets.filter((s) => load(s) === top);
+    const firstReps = atTop[0]!.reps;
+    const minReps = Math.min(...atTop.map((s) => s.reps));
+    const topWeight = equipment === 'bodyweight' && top === 0 ? null : top;
+    const basis = { weight: topWeight, reps: minReps, sets: atTop.length, date: w.date };
+
+    const held = atTop.length >= 2 && atTop.every((s) => s.reps >= firstReps);
+    if (held && topWeight !== null) {
+      return { weight: Math.min(MAX_WEIGHT_KG, Math.round((top + step) * 100) / 100), reps: firstReps, kind: 'increase', basis };
+    }
+    return { weight: topWeight, reps: Math.min(MAX_REPS, minReps + 1), kind: 'add-rep', basis };
+  }
+  return null;
+}
+
 /** Text to pre-fill the set form with, from a previous set. */
 export function setToInputText(set: SetEntry | null): { weight: string; reps: string } {
   if (!set) return { weight: '', reps: '' };

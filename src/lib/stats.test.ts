@@ -5,6 +5,7 @@ import {
   countWorkoutsThisWeek,
   estimateOneRepMax,
   percentChange,
+  personalRecordSetIds,
   recentExercises,
   recentHighlights,
   recentVolumes,
@@ -180,6 +181,19 @@ describe('per-exercise history', () => {
     expect(percentChange(0, 500)).toBeNull();
     expect(recentHighlights(history, 2).map((h) => h.exerciseId)).toEqual(['squat', 'bench']);
     expect(recentHighlights(history, 1)[0]?.bestOneRepMax).toBeCloseTo(110 * 1.1);
+  });
+
+  it('marks personal records chronologically, never in an exercise\'s first session', () => {
+    const w = (id: string, date: string, ex: string, sets: Array<[number, number]>) =>
+      workout(id, date, [entry(ex, sets.map(([kg, reps]) => ({ id: `${id}-${kg}-${reps}`, weight: kg, reps })))]);
+    const first = w('a', '2026-10-01', 'bench', [[60, 10], [80, 8]]); // baseline: warm-up then 101.3
+    const second = w('b', '2026-10-05', 'bench', [[80, 8], [85, 6], [90, 4]]); // 101.3 (tie), 102, 102 (tie with 85×6)
+    const third = w('c', '2026-10-09', 'bench', [[95, 3], [70, 10]]); // 104.5 record, 93.3 not
+    const records = personalRecordSetIds([third, first, second]);
+    expect([...records].sort()).toEqual(['b-85-6', 'c-95-3']);
+    // Other exercises have their own baseline.
+    expect(personalRecordSetIds([w('x', '2026-10-01', 'squat', [[100, 5]])]).size).toBe(0);
+    expect(personalRecordSetIds([])).toEqual(new Set());
   });
 
   it('lists recent exercises with their last set and date', () => {

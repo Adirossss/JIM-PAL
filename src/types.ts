@@ -37,6 +37,8 @@ export interface SetEntry {
    */
   weight: number | null;
   reps: number;
+  /** A drop set (lighter weight right after a set, no rest). Absent = normal set. */
+  drop?: boolean;
 }
 
 export interface WorkoutExercise {

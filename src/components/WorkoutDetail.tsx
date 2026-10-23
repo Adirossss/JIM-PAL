@@ -1,5 +1,5 @@
 import { formatDateHe, formatKg, formatTotal, weekdayHe } from '../lib/format';
-import { bestSet, setOneRepMax, summarizeWorkout, totalVolume } from '../lib/stats';
+import { bestSet, personalRecordSetIds, setOneRepMax, summarizeWorkout, totalVolume } from '../lib/stats';
 import { useState } from 'react';
 import { createId } from '../lib/ids';
 import { MAX_TEMPLATE_NAME } from '../lib/schema';
@@ -27,6 +27,7 @@ export function WorkoutDetail({ workoutId }: { workoutId: string }) {
   }
 
   const s = summarizeWorkout(workout);
+  const records = personalRecordSetIds(data.workouts);
   const minutes = workout.finishedAt
     ? Math.round((Date.parse(workout.finishedAt) - Date.parse(workout.startedAt)) / 60_000)
     : null;
@@ -104,6 +105,7 @@ export function WorkoutDetail({ workoutId }: { workoutId: string }) {
         <EntrySummary
           key={entry.id}
           entry={entry}
+          records={records}
           onOpen={() => navigate({ name: 'exerciseDetail', exerciseId: entry.exerciseId })}
         />
       ))}
@@ -138,10 +140,19 @@ export function Stat({ label, value, sub }: { label: string; value: string; sub?
   );
 }
 
-function EntrySummary({ entry, onOpen }: { entry: WorkoutExercise; onOpen: () => void }) {
+function EntrySummary({
+  entry,
+  records,
+  onOpen,
+}: {
+  entry: WorkoutExercise;
+  records: ReadonlySet<string>;
+  onOpen: () => void;
+}) {
   const { exercise } = useExercise(entry.exerciseId);
   const best = bestSet(entry.sets);
   const bodyweight = exercise.equipment === 'bodyweight';
+  const hasRecord = entry.sets.some((s) => records.has(s.id));
 
   return (
     <section className="card">
@@ -169,6 +180,11 @@ function EntrySummary({ entry, onOpen }: { entry: WorkoutExercise; onOpen: () =>
               <td>
                 {i + 1}
                 {set === best && ' ★'}
+                {records.has(set.id) && (
+                  <span className="pr-mark" role="img" aria-label="שיא חדש">
+                    <Icon name="trophy" size={15} />
+                  </span>
+                )}
               </td>
               <td>{set.weight === null ? '—' : `${formatKg(set.weight)} ק"ג`}</td>
               <td>{set.reps}</td>
@@ -178,7 +194,18 @@ function EntrySummary({ entry, onOpen }: { entry: WorkoutExercise; onOpen: () =>
         </tbody>
       </table>
       <div className="kv">
-        <span>נפח{best && ' · ★ הסט הטוב ביותר'}</span>
+        <span>
+          נפח{best && ' · ★ הסט הטוב ביותר'}
+          {hasRecord && (
+            <>
+              {' · '}
+              <span className="pr-mark" aria-hidden="true">
+                <Icon name="trophy" size={14} />
+              </span>{' '}
+              שיא חדש
+            </>
+          )}
+        </span>
         <span>{formatTotal(totalVolume(entry.sets))} ק"ג</span>
       </div>
       {entry.note && <p className="note-text">{entry.note}</p>}

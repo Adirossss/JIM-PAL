@@ -611,6 +611,7 @@ function WorkoutEditor({ workout, mode, history, onChange }: EditorProps) {
           workout={workout}
           entry={selected}
           index={workout.exercises.indexOf(selected)}
+          suggest={!editing}
           history={history}
           onChange={onChange}
           onRemoved={() => setSelectedId(null)}

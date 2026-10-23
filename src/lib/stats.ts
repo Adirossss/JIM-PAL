@@ -187,6 +187,33 @@ export function oneRepMaxProgress(workouts: readonly Workout[], exerciseId: stri
   return [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date));
 }
 
+/**
+ * Ids of sets that beat the exercise's previous best estimated 1RM, going
+ * through the workouts in date order. An exercise's first session only sets
+ * the baseline (no records there), and a later set in the same workout must
+ * also beat that workout's earlier sets.
+ */
+export function personalRecordSetIds(workouts: readonly Workout[]): Set<string> {
+  const ordered = [...workouts].sort((a, b) => a.date.localeCompare(b.date) || a.startedAt.localeCompare(b.startedAt));
+  const best = new Map<string, number>();
+  const records = new Set<string>();
+  for (const w of ordered) {
+    const inWorkout = new Map<string, number>();
+    for (const e of w.exercises) {
+      const before = best.get(e.exerciseId);
+      for (const s of e.sets) {
+        const value = setOneRepMax(s);
+        if (value <= 0) continue;
+        const bar = Math.max(before ?? -Infinity, inWorkout.get(e.exerciseId) ?? -Infinity);
+        if (before !== undefined && value > bar + 1e-9) records.add(s.id);
+        inWorkout.set(e.exerciseId, Math.max(inWorkout.get(e.exerciseId) ?? 0, value));
+      }
+    }
+    for (const [id, value] of inWorkout) best.set(id, Math.max(best.get(id) ?? 0, value));
+  }
+  return records;
+}
+
 /** Sunday that starts the week of a YYYY-MM-DD date (weeks start on Sunday in Israel). */
 export function startOfWeek(date: string): string {
   const [y, m, d] = date.split('-').map(Number);

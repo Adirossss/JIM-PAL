@@ -16,6 +16,7 @@ import {
   startWorkout,
   startWorkoutFrom,
   suggestNextExercises,
+  suggestNextSet,
   stepReps,
   stepWeight,
   updateSet,
@@ -207,6 +208,44 @@ describe('repeat and suggestions', () => {
     w = addSet(w, 'e1', { weight: 120, reps: 5 }, () => 's1');
     expect(suggestNextExercises(w, [chestDay, legDay])).toBeNull(); // never done before
     expect(suggestNextExercises(w, [])).toBeNull();
+  });
+});
+
+describe('suggestNextSet (progressive overload)', () => {
+  const session = (date: string, exerciseId: string, sets: Array<[number | null, number, boolean?]>): Workout => ({
+    id: `w-${date}`, date, startedAt: `${date}T10:00:00.000Z`, finishedAt: `${date}T11:00:00.000Z`, note: '',
+    exercises: [{ id: `e-${date}`, exerciseId, note: '', sets: sets.map(([weight, reps, drop], i) => ({ id: `s${i}`, weight, reps, ...(drop ? { drop } : {}) })) }],
+  });
+
+  it('adds 2.5 kg when two or more top-weight sets held their reps', () => {
+    const s = suggestNextSet('bench', [session('2026-10-20', 'bench', [[80, 8], [82.5, 6], [82.5, 6]])], 'free_weight');
+    expect(s).toEqual({ weight: 85, reps: 6, kind: 'increase', basis: { weight: 82.5, reps: 6, sets: 2, date: '2026-10-20' } });
+  });
+
+  it('aims for one more rep when the top weight was a single set or reps dropped', () => {
+    expect(suggestNextSet('lp', [session('2026-10-20', 'lp', [[140, 10], [150, 8], [160, 6]])], 'machine'))
+      .toMatchObject({ weight: 160, reps: 7, kind: 'add-rep' });
+    expect(suggestNextSet('row', [session('2026-10-20', 'row', [[60, 10], [60, 8]])], 'cable'))
+      .toMatchObject({ weight: 60, reps: 9, kind: 'add-rep' });
+  });
+
+  it('uses the most recent session and ignores drop sets', () => {
+    const history = [
+      session('2026-10-10', 'bench', [[70, 10], [70, 10]]),
+      session('2026-10-20', 'bench', [[80, 8], [80, 8], [60, 12, true]]),
+    ];
+    expect(suggestNextSet('bench', history, 'free_weight')).toMatchObject({ weight: 82.5, reps: 8, kind: 'increase' });
+  });
+
+  it('handles bodyweight with and without added load', () => {
+    expect(suggestNextSet('pu', [session('2026-10-20', 'pu', [[null, 10], [null, 10]])], 'bodyweight'))
+      .toMatchObject({ weight: null, reps: 11, kind: 'add-rep' });
+    expect(suggestNextSet('pu', [session('2026-10-20', 'pu', [[null, 10], [10, 6], [10, 6]])], 'bodyweight'))
+      .toMatchObject({ weight: 12.5, reps: 6, kind: 'increase' });
+  });
+
+  it('returns null without history', () => {
+    expect(suggestNextSet('bench', [], 'free_weight')).toBeNull();
   });
 });
 
