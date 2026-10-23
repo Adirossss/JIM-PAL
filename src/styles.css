@@ -674,6 +674,30 @@ button {
   background: var(--surface);
 }
 
+/* Display-only chip (e.g. the weekly muscle map). */
+.chip--static {
+  cursor: default;
+  min-height: 34px;
+  padding: 0 12px;
+  font-size: 0.85rem;
+}
+
+.chip--static:active {
+  transform: none;
+}
+
+/* Not trained this week. */
+.chip--faded {
+  background: transparent;
+  color: var(--muted);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.backup-reminder {
+  background: var(--accent-soft);
+  gap: 12px;
+}
+
 .chip--icon {
   width: 40px;
   padding: 0;

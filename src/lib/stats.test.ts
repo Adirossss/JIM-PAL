@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { SetEntry, Workout, WorkoutExercise } from '../types';
 import {
+  addDays,
+  weekStreak,
+  weeklySummary,
   bestSet,
   countWorkoutsThisWeek,
   estimateOneRepMax,
@@ -101,6 +104,34 @@ describe('date ordering and grouping', () => {
     expect(startOfWeek('2026-11-03')).toBe('2026-11-01'); // across a month
     expect(countWorkoutsThisWeek([w1, w2, w3a, w3b, w4], '2026-10-22')).toBe(2);
     expect(countWorkoutsThisWeek([w1, w2], '2026-10-22')).toBe(0);
+  });
+
+  it('adds days across months and counts the weekly streak', () => {
+    expect(addDays('2026-10-31', 1)).toBe('2026-11-01');
+    expect(addDays('2026-03-01', -1)).toBe('2026-02-28');
+    const on = (id: string, date: string) => workout(id, date, []);
+    const weekly = [on('a', '2026-10-01'), on('b', '2026-10-06'), on('c', '2026-10-13'), on('d', '2026-10-20')];
+    // Weeks of 27.9, 4.10, 11.10, 18.10 all trained.
+    expect(weekStreak(weekly, '2026-10-22')).toBe(4);
+    // This week (25.10) not trained yet: streak still counts up to last week.
+    expect(weekStreak(weekly, '2026-10-27')).toBe(4);
+    // Two weeks without training: broken.
+    expect(weekStreak(weekly, '2026-11-03')).toBe(0);
+    expect(weekStreak([on('x', '2026-10-01'), on('y', '2026-10-20')], '2026-10-22')).toBe(1);
+  });
+
+  it('summarizes this week with sets per muscle and last week\'s volume for the same days', () => {
+    const muscleOf = (id: string) => (id === 'bench' ? 'chest' : id === 'squat' ? 'quads' : undefined);
+    const history = [
+      workout('new', '2026-10-01', [entry('bench', [set(90, 3), set(70, 10)])]),
+      workout('none', '2026-10-05', [entry('squat', [set(110, 3)])]),
+    ];
+    const s = weeklySummary(history, '2026-10-06', muscleOf);
+    // Week of 4.10: 'none' (5.10, squat 110×3).  Last week same days (27.9–29.9): nothing.
+    expect(s).toMatchObject({ workouts: 1, sets: 1, volume: 330, previousVolume: 0, muscleSets: { quads: 1 } });
+    const t = weeklySummary(history, '2026-10-01', muscleOf);
+    // Week of 27.9: 'new' (1.10) bench ×2 sets; same days last week (20.9–24.9): nothing.
+    expect(t).toMatchObject({ workouts: 1, sets: 2, volume: 970, muscleSets: { chest: 2 } });
   });
 
   it('groups by month with Hebrew labels, newest first', () => {

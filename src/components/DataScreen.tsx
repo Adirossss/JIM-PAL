@@ -1,8 +1,9 @@
 import { useRef, useState, type ChangeEvent } from 'react';
-import { exportFileName, parseImport, serializeExport } from '../lib/schema';
+import { parseImport } from '../lib/schema';
 import { useApp } from '../state/AppContext';
 import { useConfirm } from '../state/confirm';
 import { useThemePreference } from '../state/theme';
+import { exportBackup, useBackupReminder } from '../state/backup';
 import { THEME_LABELS_HE, THEME_PREFERENCES } from '../lib/theme';
 import { ScreenHeader } from './common';
 import { Stat } from './WorkoutDetail';
@@ -42,18 +43,16 @@ export function DataScreen() {
   const fileInput = useRef<HTMLInputElement>(null);
   const [status, setStatus] = useState<Status>(null);
 
-  const exportData = () => {
-    const now = new Date();
-    const blob = new Blob([serializeExport(data, now)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = exportFileName(now);
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-    setStatus({ kind: 'success', message: `הקובץ ${a.download} נוצר.` });
+  const backup = useBackupReminder(data);
+
+  const exportData = async () => {
+    const result = await exportBackup(data);
+    if (result.kind === 'cancelled') return;
+    backup.refresh();
+    setStatus({
+      kind: 'success',
+      message: result.kind === 'shared' ? 'הגיבוי נשמר.' : `הקובץ ${result.fileName} נוצר.`,
+    });
   };
 
   const importFile = async (e: ChangeEvent<HTMLInputElement>) => {
@@ -117,9 +116,12 @@ export function DataScreen() {
 
       <section className="card">
         <h2>ייצוא</h2>
-        <p className="small muted">שומר את כל האימונים, התרגילים המותאמים והאימון הפעיל לקובץ JSON.</p>
+        <p className="small muted">שומר את כל האימונים, התבניות, המועדפים והאימון הפעיל לקובץ JSON. בטלפון נפתח תפריט השיתוף: אפשר לשמור ב"קבצים" או לשלוח לעצמך.</p>
+        <p className="small">
+          גיבוי אחרון: {backup.days === null ? 'עוד לא גיבית במכשיר הזה' : backup.days === 0 ? 'היום' : backup.days === 1 ? 'אתמול' : `לפני ${backup.days} ימים`}
+        </p>
         <button type="button" className="btn btn--primary" onClick={exportData}>
-          ייצוא לקובץ JSON
+          גבה עכשיו (ייצוא לקובץ JSON)
         </button>
       </section>
 

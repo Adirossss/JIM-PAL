@@ -6,6 +6,9 @@ import {
   STORAGE_KEY,
   THEME_KEY,
   loadAppData,
+  loadBackupState,
+  recordBackup,
+  snoozeBackupReminder,
   loadThemePreference,
   saveThemePreference,
   memoryStore,
@@ -99,6 +102,15 @@ describe('storage', () => {
     const broken: KeyValueStore = { getItem: () => { throw new Error('x'); }, setItem: () => { throw new Error('x'); } };
     expect(loadThemePreference(broken)).toBe('light');
     expect(() => saveThemePreference(broken, 'dark')).not.toThrow();
+  });
+
+  it('keeps the last backup time and the reminder snooze per device', () => {
+    const store = memoryStore();
+    expect(loadBackupState(store)).toEqual({ lastBackupAt: null, snoozedUntil: null });
+    recordBackup(store, NOW);
+    snoozeBackupReminder(store, '2026-10-25T20:00:00.000Z');
+    expect(loadBackupState(store)).toEqual({ lastBackupAt: NOW.toISOString(), snoozedUntil: '2026-10-25T20:00:00.000Z' });
+    expect(store.getItem(STORAGE_KEY)).toBeNull();
   });
 
   it('reports a failed save without throwing', () => {

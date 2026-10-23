@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   formatDateHe,
   formatKg,
@@ -17,6 +17,7 @@ import {
   recentlyUsedExerciseIds,
   sortWorkoutsNewestFirst,
   summarizeWorkout,
+  weeklySummary,
 } from '../lib/stats';
 import {
   addExercise,
@@ -30,9 +31,10 @@ import {
 } from '../lib/workout';
 import { sortTemplates } from '../lib/templates';
 import { useApp } from '../state/AppContext';
+import { exportBackup, useBackupReminder } from '../state/backup';
 import { useConfirm } from '../state/confirm';
-import { MUSCLE_LABELS_HE, type Workout, type WorkoutTemplate } from '../types';
-import { DateField, EmptyState, Icon, ScreenHeader, formatSet } from './common';
+import { MUSCLE_GROUPS, MUSCLE_LABELS_HE, type Workout, type WorkoutTemplate } from '../types';
+import { DateField, EmptyState, Icon, ScreenHeader, Toast, formatSet } from './common';
 import { ExerciseEntryCard } from './ExerciseEntryCard';
 import { ExercisePicker } from './ExercisePicker';
 
@@ -86,6 +88,7 @@ function Home() {
       </div>
 
       <section className="sheet" aria-label="סיכום">
+        <BackupReminder />
         {last ? (
           <>
             {recentExerciseChips(recentlyUsedExerciseIds(data.workouts).slice(0, 8))}
@@ -98,6 +101,7 @@ function Home() {
               }
             />
             {lastWorkoutCard(last)}
+            <WeekCard />
             <RepeatWorkouts
               title="חזור על אימון קודם"
               onRepeat={(source) =>
@@ -216,6 +220,113 @@ function Home() {
       </div>
     );
   }
+}
+
+/** "השבוע": workouts, sets and volume this week, the weekly streak and which muscles were trained. */
+function WeekCard() {
+  const { data, exerciseById } = useApp();
+  const today = toLocalDateString(new Date());
+  const week = weeklySummary(data.workouts, today, (id) => exerciseById.get(id)?.primaryMuscle);
+  const change = percentChange(week.previousVolume, week.volume);
+  const untrained = MUSCLE_GROUPS.filter((m) => !week.muscleSets[m]);
+
+  return (
+    <section className="card" aria-label="השבוע">
+      <div className="row" style={{ justifyContent: 'space-between' }}>
+        <h3>השבוע</h3>
+        {week.streak > 0 && (
+          <span className="badge badge--accent">
+            <Icon name="flame" size={15} />
+            &nbsp;רצף של {week.streak} {week.streak === 1 ? 'שבוע' : 'שבועות'}
+          </span>
+        )}
+      </div>
+      <div className="stat-grid" style={{ gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' }}>
+        <div className="stat">
+          <span className="stat__label">אימונים</span>
+          <span className="stat__value">{week.workouts}</span>
+        </div>
+        <div className="stat">
+          <span className="stat__label">סטים</span>
+          <span className="stat__value">{week.sets}</span>
+        </div>
+        <div className="stat">
+          <span className="stat__label">נפח (ק"ג)</span>
+          <span className="stat__value">{formatTotal(week.volume)}</span>
+          {change !== null && (
+            <span className="stat__sub">
+              <bdi>{change > 0 ? `+${change}%` : `${change}%`}</bdi> משבוע שעבר
+            </span>
+          )}
+        </div>
+      </div>
+      <div className="stack" style={{ gap: 8 }}>
+        <span className="small muted">שרירים השבוע (מספר סטים)</span>
+        <div className="chips" aria-label="שרירים השבוע">
+          {MUSCLE_GROUPS.map((m) => {
+            const sets = week.muscleSets[m];
+            return (
+              <span key={m} className={`chip chip--static ${sets ? 'chip--on' : 'chip--faded'}`}>
+                {MUSCLE_LABELS_HE[m]}
+                {sets ? ` · ${sets}` : ''}
+              </span>
+            );
+          })}
+        </div>
+        {week.workouts > 0 && untrained.length > 0 && (
+          <span className="small muted">
+            עוד לא עבדת השבוע על: {untrained.map((m) => MUSCLE_LABELS_HE[m]).join(', ')}
+          </span>
+        )}
+      </div>
+    </section>
+  );
+}
+
+/** Nudge to export a backup: the data lives only on this phone. */
+function BackupReminder() {
+  const { data } = useApp();
+  const reminder = useBackupReminder(data);
+  const [done, setDone] = useState<string | null>(null);
+  const clearDone = useCallback(() => setDone(null), []);
+
+  const backupNow = async () => {
+    const result = await exportBackup(data);
+    if (result.kind === 'cancelled') return;
+    reminder.refresh();
+    setDone('הגיבוי נשמר');
+  };
+
+  return (
+    <>
+      {reminder.show && (
+        <section className="card backup-reminder" aria-label="תזכורת גיבוי">
+          <div className="row" style={{ flexWrap: 'nowrap', alignItems: 'flex-start' }}>
+            <span className="suggest-set__icon" aria-hidden="true">
+              <Icon name="backup" />
+            </span>
+            <span className="stack" style={{ gap: 2 }}>
+              <strong>כדאי לגבות את האימונים</strong>
+              <span className="small muted">
+                {reminder.days === null
+                  ? 'עוד לא גיבית. הנתונים שמורים רק בטלפון הזה.'
+                  : `עברו ${reminder.days} ימים מהגיבוי האחרון.`}
+              </span>
+            </span>
+          </div>
+          <div className="row">
+            <button type="button" className="btn btn--primary btn--small" onClick={backupNow}>
+              גבה עכשיו
+            </button>
+            <button type="button" className="btn btn--ghost btn--small" onClick={reminder.snooze}>
+              אחר כך
+            </button>
+          </div>
+        </section>
+      )}
+      {done && <Toast message={done} icon="check" onDone={clearDone} />}
+    </>
+  );
 }
 
 /** Saved templates, each with a "התחל" button; delete one with the trash button. */

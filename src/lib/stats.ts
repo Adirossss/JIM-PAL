@@ -1,4 +1,4 @@
-import type { SetEntry, Workout } from '../types';
+import type { MuscleGroup, SetEntry, Workout } from '../types';
 
 /** Load counted for a set: bodyweight sets with no added load count as 0 kg. */
 export function setLoad(set: SetEntry): number {
@@ -220,6 +220,67 @@ export function startOfWeek(date: string): string {
   const utc = new Date(Date.UTC(y ?? 1970, (m ?? 1) - 1, d ?? 1));
   utc.setUTCDate(utc.getUTCDate() - utc.getUTCDay());
   return utc.toISOString().slice(0, 10);
+}
+
+/** YYYY-MM-DD shifted by whole days (UTC-based, so DST never skews it). */
+export function addDays(date: string, days: number): string {
+  const [y, m, d] = date.split('-').map(Number);
+  const utc = new Date(Date.UTC(y ?? 1970, (m ?? 1) - 1, (d ?? 1) + days));
+  return utc.toISOString().slice(0, 10);
+}
+
+/**
+ * Consecutive weeks (Sunday–Saturday) with at least one workout, counting
+ * back from this week. A week not trained yet does not break the streak
+ * until it is over, so the count starts from last week in that case.
+ */
+export function weekStreak(workouts: readonly Workout[], today: string): number {
+  const weeks = new Set(workouts.filter((w) => w.date <= today).map((w) => startOfWeek(w.date)));
+  let week = startOfWeek(today);
+  if (!weeks.has(week)) week = addDays(week, -7);
+  let streak = 0;
+  while (weeks.has(week)) {
+    streak += 1;
+    week = addDays(week, -7);
+  }
+  return streak;
+}
+
+export interface WeeklySummary {
+  workouts: number;
+  sets: number;
+  volume: number;
+  /** Volume of the same days last week (Sunday up to the same weekday), for a fair comparison. */
+  previousVolume: number;
+  streak: number;
+  /** Sets per primary muscle group this week. */
+  muscleSets: Partial<Record<MuscleGroup, number>>;
+}
+
+/** This week's training at a glance. `muscleOf` maps an exercise id to its primary muscle. */
+export function weeklySummary(
+  workouts: readonly Workout[],
+  today: string,
+  muscleOf: (exerciseId: string) => MuscleGroup | undefined,
+): WeeklySummary {
+  const start = startOfWeek(today);
+  const thisWeek = workouts.filter((w) => w.date >= start && w.date <= today);
+  const lastWeekSameDays = workouts.filter((w) => w.date >= addDays(start, -7) && w.date <= addDays(today, -7));
+  const muscleSets: Partial<Record<MuscleGroup, number>> = {};
+  for (const w of thisWeek) {
+    for (const e of w.exercises) {
+      const muscle = muscleOf(e.exerciseId);
+      if (muscle && e.sets.length > 0) muscleSets[muscle] = (muscleSets[muscle] ?? 0) + e.sets.length;
+    }
+  }
+  return {
+    workouts: thisWeek.length,
+    sets: thisWeek.reduce((n, w) => n + summarizeWorkout(w).setCount, 0),
+    volume: thisWeek.reduce((n, w) => n + summarizeWorkout(w).volume, 0),
+    previousVolume: lastWeekSameDays.reduce((n, w) => n + summarizeWorkout(w).volume, 0),
+    streak: weekStreak(workouts, today),
+    muscleSets,
+  };
 }
 
 /** Finished workouts dated in the same week as `today`. */

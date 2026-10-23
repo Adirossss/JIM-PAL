@@ -106,6 +106,39 @@ export function saveThemePreference(store: KeyValueStore, preference: ThemePrefe
   }
 }
 
+/** When the last backup was exported, and until when its reminder is snoozed (per device). */
+export const LAST_BACKUP_KEY = 'jim-pal:lastBackupAt';
+export const BACKUP_SNOOZE_KEY = 'jim-pal:backupSnoozedUntil';
+
+export interface BackupState {
+  lastBackupAt: string | null;
+  snoozedUntil: string | null;
+}
+
+export function loadBackupState(store: KeyValueStore): BackupState {
+  try {
+    return { lastBackupAt: store.getItem(LAST_BACKUP_KEY), snoozedUntil: store.getItem(BACKUP_SNOOZE_KEY) };
+  } catch {
+    return { lastBackupAt: null, snoozedUntil: null };
+  }
+}
+
+export function recordBackup(store: KeyValueStore, now: Date): void {
+  try {
+    store.setItem(LAST_BACKUP_KEY, now.toISOString());
+  } catch {
+    // Not critical: the reminder may simply show again.
+  }
+}
+
+export function snoozeBackupReminder(store: KeyValueStore, until: string): void {
+  try {
+    store.setItem(BACKUP_SNOOZE_KEY, until);
+  } catch {
+    // Not critical.
+  }
+}
+
 /** window.localStorage, or null when unavailable (e.g. blocked by privacy settings). */
 export function browserStore(): KeyValueStore | null {
   try {

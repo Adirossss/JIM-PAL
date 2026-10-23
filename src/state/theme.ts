@@ -1,12 +1,7 @@
 import { useState } from 'react';
 import { THEME_COLORS, resolveTheme, type ThemePreference } from '../lib/theme';
-import { browserStore, loadThemePreference, memoryStore, saveThemePreference, type KeyValueStore } from '../lib/storage';
-
-let store: KeyValueStore | null = null;
-function themeStore(): KeyValueStore {
-  store ??= browserStore() ?? memoryStore();
-  return store;
-}
+import { loadThemePreference, saveThemePreference } from '../lib/storage';
+import { deviceStore as themeStore } from './deviceStore';
 
 /**
  * Puts the preference on <html data-theme> (the CSS picks the palette from it;
