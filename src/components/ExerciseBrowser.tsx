@@ -42,6 +42,11 @@ export function ExerciseBrowser({ onSelect, autoFocus = false, markedIds }: Prop
             placeholder="חיפוש בעברית או באנגלית…"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              // The keyboard's "Search" key closes the keyboard so the whole result list is visible.
+              if (e.key === 'Enter') e.currentTarget.blur();
+            }}
+            enterKeyHint="search"
             autoFocus={autoFocus}
             aria-label="חיפוש תרגיל"
           />

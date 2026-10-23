@@ -1556,8 +1556,8 @@ h2.exercise-title .exercise-title__he {
   background: var(--sheet);
   width: 100%;
   max-width: 640px;
-  height: 92vh;
-  height: 92dvh;
+  /* % of the backdrop, which shrinks to the area above the keyboard. */
+  height: 92%;
   border-radius: 32px 32px 0 0;
   display: flex;
   flex-direction: column;
@@ -1586,7 +1586,7 @@ h2.exercise-title .exercise-title__he {
   }
 
   .modal {
-    height: 85vh;
+    height: 85%;
     border-radius: 32px;
   }
 }

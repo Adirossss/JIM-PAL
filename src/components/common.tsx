@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { formatDateHe, formatKg, isValidDateString, relativeDayHe, toLocalDateString, weekdayHe } from '../lib/format';
 import { useApp } from '../state/AppContext';
 import { EQUIPMENT_LABELS_HE, MUSCLE_LABELS_HE, type EquipmentType, type Exercise, type SetEntry } from '../types';
@@ -164,7 +164,31 @@ export function SetText({ set, equipment }: { set: SetEntry; equipment: Equipmen
   return <bdi className="set-text">{formatSet(set, equipment)}</bdi>;
 }
 
+/**
+ * The part of the screen not covered by the on-screen keyboard. iOS does not
+ * shrink fixed elements when the keyboard opens, so a sheet sized to the full
+ * screen would hide its bottom rows behind the keyboard, out of scroll reach.
+ */
+function useVisibleViewport(): { top: number; height: number } | null {
+  const [box, setBox] = useState<{ top: number; height: number } | null>(null);
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const update = () => setBox({ top: vv.offsetTop, height: vv.height });
+    update();
+    vv.addEventListener('resize', update);
+    vv.addEventListener('scroll', update);
+    return () => {
+      vv.removeEventListener('resize', update);
+      vv.removeEventListener('scroll', update);
+    };
+  }, []);
+  return box;
+}
+
 export function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+  const visible = useVisibleViewport();
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -179,7 +203,11 @@ export function Modal({ title, onClose, children }: { title: string; onClose: ()
   }, [onClose]);
 
   return (
-    <div className="modal-backdrop" onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <div
+      className="modal-backdrop"
+      style={visible ? { top: visible.top, height: visible.height, bottom: 'auto' } : undefined}
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
       <div className="modal" role="dialog" aria-modal="true" aria-label={title}>
         <div className="modal__header">
           <h2>{title}</h2>
