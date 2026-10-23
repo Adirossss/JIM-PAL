@@ -108,6 +108,19 @@ textarea {
   -webkit-user-select: text;
 }
 
+/* No scroll bars or scroll indicators anywhere: lists still scroll, like a native app. */
+* {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+*::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+  background: transparent;
+}
+
 h1,
 h2,
 h3 {
