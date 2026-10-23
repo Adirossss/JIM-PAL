@@ -4,7 +4,17 @@ import { exerciseStats, oneRepMaxProgress, percentChange, setOneRepMax } from '.
 import { addExercise, startWorkout } from '../lib/workout';
 import { useApp } from '../state/AppContext';
 import { MUSCLE_LABELS_HE } from '../types';
-import { BackButton, EmptyState, ExerciseTags, ExerciseTitle, ScreenHeader, SetText, formatSet, useExercise } from './common';
+import {
+  BackButton,
+  EmptyState,
+  ExerciseTags,
+  ExerciseTitle,
+  FavoriteButton,
+  ScreenHeader,
+  SetText,
+  formatSet,
+  useExercise,
+} from './common';
 import { ProgressChart } from './ProgressChart';
 
 export function ExerciseDetail({ exerciseId }: { exerciseId: string }) {
@@ -30,7 +40,11 @@ export function ExerciseDetail({ exerciseId }: { exerciseId: string }) {
   return (
     <div className="stack" style={{ gap: 0 }}>
       <div className="progress-hero">
-        <ScreenHeader start={<BackButton onClick={() => goBack({ name: 'exercises' })} />} title="התקדמות" />
+        <ScreenHeader
+          start={<BackButton onClick={() => goBack({ name: 'exercises' })} />}
+          title="התקדמות"
+          end={<FavoriteButton exerciseId={exerciseId} name={exercise.nameHe} />}
+        />
         <div className="hero-text">
           <span className="small" style={{ color: 'var(--muted)' }}>
             1RM משוער · {exercise.nameHe}

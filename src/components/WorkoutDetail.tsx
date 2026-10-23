@@ -1,13 +1,19 @@
 import { formatDateHe, formatKg, formatTotal, weekdayHe } from '../lib/format';
 import { bestSet, setOneRepMax, summarizeWorkout, totalVolume } from '../lib/stats';
+import { useState } from 'react';
+import { createId } from '../lib/ids';
+import { MAX_TEMPLATE_NAME } from '../lib/schema';
+import { createTemplate } from '../lib/templates';
 import { useApp } from '../state/AppContext';
-import { useConfirm } from '../state/confirm';
-import type { WorkoutExercise } from '../types';
+import { useConfirm, usePrompt } from '../state/confirm';
+import { MUSCLE_LABELS_HE, type WorkoutExercise } from '../types';
 import { BackButton, EmptyState, ExerciseTags, ExerciseTitle, Icon, ScreenHeader, useExercise } from './common';
 
 export function WorkoutDetail({ workoutId }: { workoutId: string }) {
-  const { data, update, goBack, navigate } = useApp();
+  const { data, update, goBack, navigate, exerciseById } = useApp();
   const confirm = useConfirm();
+  const prompt = usePrompt();
+  const [savedTemplate, setSavedTemplate] = useState<string | null>(null);
   const workout = data.workouts.find((w) => w.id === workoutId);
   const back = <BackButton onClick={() => goBack({ name: 'history' })} />;
 
@@ -24,6 +30,30 @@ export function WorkoutDetail({ workoutId }: { workoutId: string }) {
   const minutes = workout.finishedAt
     ? Math.round((Date.parse(workout.finishedAt) - Date.parse(workout.startedAt)) / 60_000)
     : null;
+
+  const saveAsTemplate = async () => {
+    const muscles = [
+      ...new Set(
+        workout.exercises.map((e) => {
+          const m = exerciseById.get(e.exerciseId)?.primaryMuscle;
+          return m ? MUSCLE_LABELS_HE[m] : 'אחר';
+        }),
+      ),
+    ];
+    const name = await prompt({
+      title: 'שמירה כתבנית',
+      message: `${s.exerciseCount} התרגילים של האימון יישמרו, בלי הסטים. בפעם הבאה הם ייכנסו בלחיצה אחת.`,
+      label: 'שם התבנית',
+      initial: `יום ${muscles.join(' ו')}`.slice(0, MAX_TEMPLATE_NAME),
+      maxLength: MAX_TEMPLATE_NAME,
+      confirmLabel: 'שמור תבנית',
+    });
+    if (!name) return;
+    const result = createTemplate(name, workout, createId('tpl-'), new Date());
+    if (!result.ok) return;
+    update((d) => ({ ...d, templates: [...d.templates, result.template] }));
+    setSavedTemplate(result.template.name);
+  };
 
   const remove = async () => {
     const ok = await confirm({
@@ -63,6 +93,17 @@ export function WorkoutDetail({ workoutId }: { workoutId: string }) {
           onOpen={() => navigate({ name: 'exerciseDetail', exerciseId: entry.exerciseId })}
         />
       ))}
+
+      {savedTemplate && (
+        <div className="notice notice--success" role="status">
+          התבנית "{savedTemplate}" נשמרה. היא מחכה לך במסך הבית, עם כפתור "התחל".
+        </div>
+      )}
+
+      <button type="button" className="btn btn--secondary btn--large btn--block" onClick={saveAsTemplate}>
+        <Icon name="bookmark" size={18} />
+        שמור כתבנית
+      </button>
 
       <div className="finish-bar">
         <button type="button" className="btn btn--ghost btn--danger" onClick={remove}>

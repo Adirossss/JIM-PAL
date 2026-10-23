@@ -1,4 +1,13 @@
-import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+  type ReactNode,
+} from 'react';
 
 export interface ConfirmOptions {
   title: string;
@@ -9,53 +18,98 @@ export interface ConfirmOptions {
   danger?: boolean;
 }
 
-type Confirm = (options: ConfirmOptions) => Promise<boolean>;
+export interface PromptOptions {
+  title: string;
+  message?: string;
+  label: string;
+  initial?: string;
+  placeholder?: string;
+  maxLength?: number;
+  confirmLabel: string;
+}
 
-const ConfirmContext = createContext<Confirm | null>(null);
+type Confirm = (options: ConfirmOptions) => Promise<boolean>;
+type Prompt = (options: PromptOptions) => Promise<string | null>;
+
+type Request =
+  | { kind: 'confirm'; options: ConfirmOptions; resolve: (ok: boolean) => void }
+  | { kind: 'prompt'; options: PromptOptions; resolve: (value: string | null) => void };
+
+const DialogContext = createContext<{ confirm: Confirm; prompt: Prompt } | null>(null);
 
 /**
- * In-app replacement for window.confirm: a bottom sheet that resolves to
- * true (confirm) or false (cancel, backdrop, Escape). Native confirm dialogs
- * show the site's address, which makes a home-screen app feel like a website.
+ * In-app replacements for window.confirm / window.prompt: bottom sheets that
+ * resolve when closed. Native dialogs show the site's address, which makes a
+ * home-screen app feel like a website.
  */
 export function ConfirmProvider({ children }: { children: ReactNode }) {
-  const [request, setRequest] = useState<{ options: ConfirmOptions; resolve: (ok: boolean) => void } | null>(null);
+  const [request, setRequest] = useState<Request | null>(null);
 
   const confirm = useCallback<Confirm>(
-    (options) => new Promise<boolean>((resolve) => setRequest({ options, resolve })),
+    (options) => new Promise<boolean>((resolve) => setRequest({ kind: 'confirm', options, resolve })),
     [],
   );
-
-  const close = (ok: boolean) => {
-    request?.resolve(ok);
-    setRequest(null);
-  };
+  const prompt = useCallback<Prompt>(
+    (options) => new Promise<string | null>((resolve) => setRequest({ kind: 'prompt', options, resolve })),
+    [],
+  );
+  const [api] = useState(() => ({ confirm, prompt }));
 
   return (
-    <ConfirmContext.Provider value={confirm}>
+    <DialogContext.Provider value={api}>
       {children}
-      {request && <ConfirmSheet options={request.options} onClose={close} />}
-    </ConfirmContext.Provider>
+      {request?.kind === 'confirm' && (
+        <ConfirmSheet
+          options={request.options}
+          onClose={(ok) => {
+            request.resolve(ok);
+            setRequest(null);
+          }}
+        />
+      )}
+      {request?.kind === 'prompt' && (
+        <PromptSheet
+          options={request.options}
+          onClose={(value) => {
+            request.resolve(value);
+            setRequest(null);
+          }}
+        />
+      )}
+    </DialogContext.Provider>
   );
 }
 
+function useDialogs() {
+  const api = useContext(DialogContext);
+  if (!api) throw new Error('dialogs must be used inside <ConfirmProvider>');
+  return api;
+}
+
 export function useConfirm(): Confirm {
-  const confirm = useContext(ConfirmContext);
-  if (!confirm) throw new Error('useConfirm must be used inside <ConfirmProvider>');
-  return confirm;
+  return useDialogs().confirm;
+}
+
+export function usePrompt(): Prompt {
+  return useDialogs().prompt;
+}
+
+function useEscape(onEscape: () => void) {
+  const ref = useRef(onEscape);
+  ref.current = onEscape;
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') ref.current();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 }
 
 function ConfirmSheet({ options, onClose }: { options: ConfirmOptions; onClose: (ok: boolean) => void }) {
   const confirmRef = useRef<HTMLButtonElement>(null);
-
-  useEffect(() => {
-    confirmRef.current?.focus();
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose(false);
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  useEscape(() => onClose(false));
+  useEffect(() => confirmRef.current?.focus(), []);
 
   return (
     <div className="modal-backdrop" onClick={(e) => e.target === e.currentTarget && onClose(false)}>
@@ -88,6 +142,46 @@ function ConfirmSheet({ options, onClose }: { options: ConfirmOptions; onClose: 
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+function PromptSheet({ options, onClose }: { options: PromptOptions; onClose: (value: string | null) => void }) {
+  const [value, setValue] = useState(options.initial ?? '');
+  useEscape(() => onClose(null));
+
+  const submit = (e: FormEvent) => {
+    e.preventDefault();
+    if (value.trim()) onClose(value.trim());
+  };
+
+  return (
+    <div className="modal-backdrop" onClick={(e) => e.target === e.currentTarget && onClose(null)}>
+      <form className="confirm-sheet" role="dialog" aria-modal="true" aria-labelledby="prompt-title" onSubmit={submit}>
+        <span className="progress-sheet__grip" aria-hidden="true" />
+        <h2 id="prompt-title">{options.title}</h2>
+        {options.message && <p className="muted">{options.message}</p>}
+        <label className="field">
+          <span className="field__label">{options.label}</span>
+          <input
+            className="input"
+            value={value}
+            placeholder={options.placeholder}
+            maxLength={options.maxLength}
+            onChange={(e) => setValue(e.target.value)}
+            autoFocus
+            enterKeyHint="done"
+          />
+        </label>
+        <div className="confirm-sheet__actions">
+          <button type="submit" data-confirm="yes" className="btn btn--primary btn--large" disabled={!value.trim()}>
+            {options.confirmLabel}
+          </button>
+          <button type="button" data-confirm="no" className="btn btn--secondary btn--large" onClick={() => onClose(null)}>
+            ביטול
+          </button>
+        </div>
+      </form>
     </div>
   );
 }

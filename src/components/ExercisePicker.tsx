@@ -25,7 +25,13 @@ export function ExercisePicker({ onPick, onClose, markedIds }: Props) {
           <ExerciseBrowser
             onSelect={onPick}
             markedIds={markedIds}
-            unfilteredTop={<RecentTiles onPick={onPick} markedIds={markedIds} />}
+            unfilteredTop={
+              <>
+                <FavoriteChips onPick={onPick} markedIds={markedIds} />
+                <RecentTiles onPick={onPick} markedIds={markedIds} />
+                <h3 className="section-title">כל התרגילים</h3>
+              </>
+            }
           />
           <button type="button" className="btn btn--secondary btn--block" onClick={() => setCreating(true)}>
             + תרגיל מותאם אישית
@@ -75,7 +81,36 @@ function RecentTiles({ onPick, markedIds }: { onPick: (exercise: Exercise) => vo
           );
         })}
       </div>
-      <h3 className="section-title">כל התרגילים</h3>
+    </section>
+  );
+}
+
+/** Starred exercises as one-tap chips (star one from its progress page). */
+function FavoriteChips({ onPick, markedIds }: { onPick: (exercise: Exercise) => void; markedIds?: ReadonlySet<string> }) {
+  const { data, exerciseById } = useApp();
+  const favorites = data.favoriteExerciseIds.map((id) => exerciseById.get(id)).filter((e): e is Exercise => !!e);
+  if (favorites.length === 0) return null;
+
+  return (
+    <section className="stack" style={{ gap: 10 }} aria-label="מועדפים">
+      <h3 className="section-title">מועדפים</h3>
+      <div className="chips">
+        {favorites.map((e) => {
+          const added = markedIds?.has(e.id) ?? false;
+          return (
+            <button
+              key={e.id}
+              type="button"
+              className={`chip ${added ? 'chip--on' : 'chip--surface'}`}
+              onClick={() => onPick(e)}
+              aria-label={`הוסף ${e.nameHe}${added ? ' (כבר באימון)' : ''}`}
+            >
+              <Icon name={added ? 'check' : 'star'} size={16} filled={!added} />
+              {e.nameHe}
+            </button>
+          );
+        })}
+      </div>
     </section>
   );
 }

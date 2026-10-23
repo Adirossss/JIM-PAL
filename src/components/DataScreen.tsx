@@ -76,6 +76,8 @@ export function DataScreen() {
           <Stat label="אימונים שהסתיימו" value={String(data.workouts.length)} />
           <Stat label="תרגילים מותאמים" value={String(data.customExercises.length)} />
           <Stat label="אימון פעיל" value={data.activeWorkout ? 'כן' : 'לא'} />
+          <Stat label="תבניות" value={String(data.templates.length)} />
+          <Stat label="מועדפים" value={String(data.favoriteExerciseIds.length)} />
         </div>
         <p className="small muted">
           הנתונים נשמרים רק בדפדפן הזה, במכשיר הזה. ניקוי נתוני האתר בדפדפן ימחק אותם, לכן כדאי לייצא גיבוי מדי פעם.

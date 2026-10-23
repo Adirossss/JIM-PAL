@@ -12,7 +12,11 @@ import {
 
 function sampleData(): AppData {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
+    favoriteExerciseIds: ['pull-up', 'custom-zercher'],
+    templates: [
+      { id: 't1', name: 'יום חזה', exerciseIds: ['barbell-bench-press', 'pull-up'], createdAt: '2026-10-21T08:00:00.000Z' },
+    ],
     customExercises: [
       { id: 'custom-zercher', nameEn: 'Zercher Squat', nameHe: 'סקוואט זרכר', primaryMuscle: 'quads',
         secondaryMuscles: ['glutes'], equipment: 'free_weight', custom: true },
@@ -64,7 +68,15 @@ describe('validateAppData', () => {
     ['empty exercise name', (d) => { d.customExercises[0]!.nameHe = '  '; }],
     ['duplicate workout id', (d) => { d.activeWorkout!.id = 'w1'; }],
     ['custom id clashing with seed', (d) => { d.customExercises[0]!.id = 'deadlift'; }],
-    ['wrong schema version', (d) => { d.schemaVersion = 2; }],
+    ['wrong schema version', (d) => { d.schemaVersion = 1; }],
+    ['favorites not a list', (d) => { (d as unknown as Record<string, unknown>).favoriteExerciseIds = 'pull-up'; }],
+    ['duplicate favorite', (d) => { d.favoriteExerciseIds = ['pull-up', 'pull-up']; }],
+    ['missing templates', (d) => { delete (d as Partial<AppData>).templates; }],
+    ['template without name', (d) => { d.templates[0]!.name = ' '; }],
+    ['template without exercises', (d) => { d.templates[0]!.exerciseIds = []; }],
+    ['template with a repeated exercise', (d) => { d.templates[0]!.exerciseIds = ['pull-up', 'pull-up']; }],
+    ['template with bad timestamp', (d) => { d.templates[0]!.createdAt = 'soon'; }],
+    ['duplicate template id', (d) => { d.templates.push({ ...d.templates[0]! }); }],
   ];
 
   it.each(broken)('rejects %s', (_name, breakIt) => {
@@ -87,6 +99,17 @@ describe('validateAppData', () => {
 describe('migrateAppData', () => {
   it('passes current-version data through validation', () => {
     expect(migrateAppData(sampleData())).toEqual({ ok: true, value: sampleData() });
+  });
+
+  it('upgrades version 1 data to version 2 without changing anything existing', () => {
+    const { favoriteExerciseIds: _f, templates: _t, ...rest } = sampleData();
+    const v1 = { ...rest, schemaVersion: 1 };
+    const r = migrateAppData(v1);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.value).toEqual({ ...rest, schemaVersion: 2, favoriteExerciseIds: [], templates: [] });
+    // A v1 backup file still imports.
+    expect(parseImport(JSON.stringify({ app: 'jim-pal', exportedAt: '2026-10-20T00:00:00.000Z', ...v1 })).ok).toBe(true);
   });
 
   it('refuses missing, invalid or newer versions', () => {

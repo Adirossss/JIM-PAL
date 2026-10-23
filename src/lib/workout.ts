@@ -27,13 +27,18 @@ export function startWorkoutFrom(
   date = toLocalDateString(now),
   newId: IdFactory = createId,
 ): Workout {
+  return startWorkoutWith(source.exercises.map((e) => e.exerciseId), now, date, newId);
+}
+
+/** A new workout with these exercises (duplicates dropped, order kept) and no sets. */
+export function startWorkoutWith(
+  exerciseIds: readonly string[],
+  now: Date,
+  date = toLocalDateString(now),
+  newId: IdFactory = createId,
+): Workout {
   let workout = startWorkout(now, date, newId);
-  const seen = new Set<string>();
-  for (const e of source.exercises) {
-    if (seen.has(e.exerciseId)) continue;
-    seen.add(e.exerciseId);
-    workout = addExercise(workout, e.exerciseId, newId);
-  }
+  for (const id of new Set(exerciseIds)) workout = addExercise(workout, id, newId);
   return workout;
 }
 

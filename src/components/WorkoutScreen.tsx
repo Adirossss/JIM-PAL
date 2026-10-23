@@ -25,11 +25,13 @@ import {
   setWorkoutNote,
   startWorkout,
   startWorkoutFrom,
+  startWorkoutWith,
   suggestNextExercises,
 } from '../lib/workout';
+import { sortTemplates } from '../lib/templates';
 import { useApp } from '../state/AppContext';
 import { useConfirm } from '../state/confirm';
-import { MUSCLE_LABELS_HE, type Workout } from '../types';
+import { MUSCLE_LABELS_HE, type Workout, type WorkoutTemplate } from '../types';
 import { DateField, EmptyState, Icon, ScreenHeader, formatSet } from './common';
 import { ExerciseEntryCard } from './ExerciseEntryCard';
 import { ExercisePicker } from './ExercisePicker';
@@ -87,6 +89,14 @@ function Home() {
         {last ? (
           <>
             {recentExerciseChips(recentlyUsedExerciseIds(data.workouts).slice(0, 8))}
+            <Templates
+              onStart={(template) =>
+                update((prev) => ({
+                  ...prev,
+                  activeWorkout: startWorkoutWith(template.exerciseIds, new Date(), isValidDateString(date) ? date : today),
+                }))
+              }
+            />
             {lastWorkoutCard(last)}
             <RepeatWorkouts
               title="חזור על אימון קודם"
@@ -206,6 +216,68 @@ function Home() {
       </div>
     );
   }
+}
+
+/** Saved templates, each with a "התחל" button; delete one with the trash button. */
+function Templates({ onStart }: { onStart: (template: WorkoutTemplate) => void }) {
+  const { data, update, exerciseById } = useApp();
+  const confirm = useConfirm();
+  const templates = sortTemplates(data.templates);
+  if (templates.length === 0) return null;
+
+  const remove = async (t: WorkoutTemplate) => {
+    const ok = await confirm({
+      title: `למחוק את התבנית "${t.name}"?`,
+      message: 'האימונים שכבר עשית לא יימחקו.',
+      confirmLabel: 'מחק תבנית',
+      danger: true,
+    });
+    if (ok) update((d) => ({ ...d, templates: d.templates.filter((x) => x.id !== t.id) }));
+  };
+
+  return (
+    <section className="stack" style={{ gap: 8 }} aria-label="התבניות שלי">
+      <h3 className="section-title">התבניות שלי</h3>
+      {templates.map((t) => {
+        const names = t.exerciseIds.map((id) => exerciseById.get(id)?.nameHe ?? 'תרגיל לא מוכר');
+        return (
+          <div key={t.id} className="card" style={{ gap: 10 }}>
+            <div className="row" style={{ justifyContent: 'space-between', flexWrap: 'nowrap' }}>
+              <span className="headline">
+                <span className="headline__date">{t.name}</span>
+                <span className="headline__stats">{t.exerciseIds.length} תרגילים</span>
+              </span>
+              <div className="row" style={{ flexWrap: 'nowrap', gap: 6 }}>
+                <button
+                  type="button"
+                  className="icon-btn icon-btn--panel icon-btn--danger"
+                  aria-label={`מחק את התבנית ${t.name}`}
+                  onClick={() => remove(t)}
+                >
+                  <Icon name="trash" size={18} />
+                </button>
+                <button
+                  type="button"
+                  className="btn btn--primary btn--small"
+                  aria-label={`התחל אימון מהתבנית ${t.name}`}
+                  onClick={() => onStart(t)}
+                >
+                  התחל
+                </button>
+              </div>
+            </div>
+            <div className="session-sets" style={{ margin: 0 }}>
+              {names.map((n, i) => (
+                <span key={`${t.exerciseIds[i]}`} className="set-chip">
+                  {n}
+                </span>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </section>
+  );
 }
 
 /** The last few workouts, each with a "חזור" button that starts a workout with the same exercises. */
@@ -485,6 +557,14 @@ function ActiveWorkout({ workout }: { workout: Workout }) {
               הוסף תרגיל
             </button>
           </EmptyState>
+          <Templates
+            onStart={(template) =>
+              updateActive((w) => ({
+                ...w,
+                exercises: startWorkoutWith(template.exerciseIds, new Date(w.startedAt), w.date).exercises,
+              }))
+            }
+          />
           <RepeatWorkouts
             title="או התחל כמו אימון קודם"
             onRepeat={(source) =>

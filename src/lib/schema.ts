@@ -9,23 +9,32 @@ import {
   type SetEntry,
   type Workout,
   type WorkoutExercise,
+  type WorkoutTemplate,
 } from '../types';
 import { isValidDateString } from './format';
 import { MAX_REPS, MAX_WEIGHT_KG } from './workout';
 
-export const CURRENT_SCHEMA_VERSION = 1;
+export const CURRENT_SCHEMA_VERSION = 2;
 export const EXPORT_APP_ID = 'jim-pal';
+export const MAX_TEMPLATE_NAME = 60;
 
 export function emptyAppData(): AppData {
-  return { schemaVersion: CURRENT_SCHEMA_VERSION, customExercises: [], workouts: [], activeWorkout: null };
+  return {
+    schemaVersion: CURRENT_SCHEMA_VERSION,
+    customExercises: [],
+    workouts: [],
+    activeWorkout: null,
+    favoriteExerciseIds: [],
+    templates: [],
+  };
 }
 
-/**
- * Upgrades raw data from version N to N + 1, keyed by N. Empty while only
- * version 1 exists; a schema change adds an entry here.
- */
+/** Upgrades raw data from version N to N + 1, keyed by N. */
 type Migration = (data: Record<string, unknown>) => Record<string, unknown>;
-export const MIGRATIONS: Readonly<Record<number, Migration>> = {};
+export const MIGRATIONS: Readonly<Record<number, Migration>> = {
+  // v2 adds favorites and workout templates; nothing existing changes.
+  1: (data) => ({ ...data, favoriteExerciseIds: [], templates: [] }),
+};
 
 export type Result<T> = { ok: true; value: T } | { ok: false; errors: string[] };
 
@@ -149,6 +158,26 @@ class Validator {
     };
   }
 
+  idList(o: Obj, key: string, path: string): string[] {
+    const list = this.array(o, key, path);
+    list.forEach((id, i) => {
+      if (typeof id !== 'string' || id.trim() === '') this.fail(`${path}.${key}[${i}]`, 'חייב להיות מזהה תרגיל');
+    });
+    return list as string[];
+  }
+
+  template(v: unknown, path: string): WorkoutTemplate | null {
+    const o = this.object(v, path);
+    if (!o) return null;
+    const name = this.string(o, 'name', path, { nonEmpty: true });
+    if (name.length > MAX_TEMPLATE_NAME) this.fail(`${path}.name`, `ארוך מ-${MAX_TEMPLATE_NAME} תווים`);
+    const exerciseIds = this.idList(o, 'exerciseIds', path);
+    if (exerciseIds.length === 0) this.fail(`${path}.exerciseIds`, 'תבנית חייבת לפחות תרגיל אחד');
+    this.unique(exerciseIds, `${path}.exerciseIds`, 'תרגיל');
+    if (!isIsoTimestamp(o.createdAt)) this.fail(`${path}.createdAt`, 'חותמת זמן לא תקינה');
+    return { id: this.string(o, 'id', path, { nonEmpty: true }), name, exerciseIds, createdAt: o.createdAt as string };
+  }
+
   unique(ids: string[], path: string, what: string): void {
     const seen = new Set<string>();
     for (const id of ids) {
@@ -175,6 +204,10 @@ export function validateAppData(value: unknown): Result<AppData> {
     .map((w, i) => v.workout(w, `workouts[${i}]`, true)) as Workout[];
   const activeWorkout = o.activeWorkout === null ? null : v.workout(o.activeWorkout, 'activeWorkout', false);
   if (!('activeWorkout' in o)) v.fail('root.activeWorkout', 'שדה חסר');
+  const favoriteExerciseIds = v.idList(o, 'favoriteExerciseIds', 'root');
+  const templates = v
+    .array(o, 'templates', 'root')
+    .map((t, i) => v.template(t, `templates[${i}]`)) as WorkoutTemplate[];
 
   if (v.errors.length === 0) {
     const seedIds = new Set(SEED_EXERCISES.map((e) => e.id));
@@ -183,12 +216,21 @@ export function validateAppData(value: unknown): Result<AppData> {
       if (seedIds.has(e.id)) v.fail('customExercises', `המזהה ${e.id} שמור לתרגיל מהספרייה`);
     }
     v.unique([...workouts, ...(activeWorkout ? [activeWorkout] : [])].map((w) => w.id), 'workouts', 'מזהה אימון');
+    v.unique(favoriteExerciseIds, 'favoriteExerciseIds', 'מועדף');
+    v.unique(templates.map((t) => t.id), 'templates', 'מזהה תבנית');
   }
 
   if (v.errors.length > 0) return { ok: false, errors: v.errors };
   return {
     ok: true,
-    value: { schemaVersion: CURRENT_SCHEMA_VERSION, customExercises, workouts, activeWorkout },
+    value: {
+      schemaVersion: CURRENT_SCHEMA_VERSION,
+      customExercises,
+      workouts,
+      activeWorkout,
+      favoriteExerciseIds,
+      templates,
+    },
   };
 }
 

@@ -63,7 +63,9 @@ npm run preview    # serve the production build locally
 ## How data is stored
 
 - All data lives under a single `localStorage` key, `jim-pal:data`, as one JSON
-  document with a `schemaVersion` field (currently `1`).
+  document with a `schemaVersion` field (currently `2`). Version 2 added
+  `favoriteExerciseIds` and `templates`; version 1 data (stored or imported) is
+  upgraded automatically by the migrations in `src/lib/schema.ts`.
 - `src/lib/storage.ts` is the only module that touches `localStorage`.
 - If stored data can't be read, it is copied to a backup key
   (`jim-pal:data:unreadable:<timestamp>`) instead of being overwritten, and the app

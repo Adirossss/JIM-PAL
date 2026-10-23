@@ -58,6 +58,16 @@ export interface Workout {
   exercises: WorkoutExercise[];
 }
 
+/** A named list of exercises to start a workout from (schema v2). */
+export interface WorkoutTemplate {
+  id: string;
+  name: string;
+  /** In workout order, each id once. */
+  exerciseIds: string[];
+  /** ISO timestamp. */
+  createdAt: string;
+}
+
 export interface AppData {
   schemaVersion: number;
   customExercises: Exercise[];
@@ -65,6 +75,10 @@ export interface AppData {
   workouts: Workout[];
   /** The in-progress workout, if any. */
   activeWorkout: Workout | null;
+  /** Exercises starred by the user, most recently starred first (schema v2). */
+  favoriteExerciseIds: string[];
+  /** Saved workout templates (schema v2). */
+  templates: WorkoutTemplate[];
 }
 
 export const MUSCLE_LABELS_HE: Record<MuscleGroup, string> = {

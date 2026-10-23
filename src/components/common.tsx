@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { formatDateHe, formatKg, isValidDateString, relativeDayHe, toLocalDateString, weekdayHe } from '../lib/format';
+import { toggleFavorite } from '../lib/templates';
 import { useApp } from '../state/AppContext';
 import { EQUIPMENT_LABELS_HE, MUSCLE_LABELS_HE, type EquipmentType, type Exercise, type SetEntry } from '../types';
 
@@ -39,16 +40,42 @@ const ICON_PATHS = {
   copy: 'M9 9h10v10H9zM5 15V5h10',
   plus: 'M12 5v14M5 12h14',
   check: 'M5 12l5 5 9-10',
+  star: 'M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.8-5.2 2.8 1-5.8-4.3-4.1 5.9-.9z',
+  bookmark: 'M7 4h10v16l-5-3.5L7 20z',
 } as const;
 
 export type IconName = keyof typeof ICON_PATHS;
 
 /** Inline stroke icon; decorative, so hidden from screen readers (label the button instead). */
-export function Icon({ name, size = 20 }: { name: IconName; size?: number }) {
+export function Icon({ name, size = 20, filled = false }: { name: IconName; size?: number; filled?: boolean }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
-      <path d={ICON_PATHS[name]} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <path
+        d={ICON_PATHS[name]}
+        fill={filled ? 'currentColor' : 'none'}
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
+  );
+}
+
+/** Star toggle for an exercise's favorite status. */
+export function FavoriteButton({ exerciseId, name }: { exerciseId: string; name: string }) {
+  const { data, update } = useApp();
+  const on = data.favoriteExerciseIds.includes(exerciseId);
+  return (
+    <button
+      type="button"
+      className={`icon-btn ${on ? 'icon-btn--star' : ''}`}
+      aria-pressed={on}
+      aria-label={on ? `הסר את ${name} מהמועדפים` : `הוסף את ${name} למועדפים`}
+      onClick={() => update((d) => ({ ...d, favoriteExerciseIds: toggleFavorite(d.favoriteExerciseIds, exerciseId) }))}
+    >
+      <Icon name="star" filled={on} />
+    </button>
   );
 }
 
