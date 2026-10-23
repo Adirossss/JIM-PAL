@@ -1,7 +1,9 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { formatDateHe, formatKg, isValidDateString, relativeDayHe, toLocalDateString, weekdayHe } from '../lib/format';
 import { toggleFavorite } from '../lib/templates';
 import { useApp } from '../state/AppContext';
+import { useScrollLock } from '../state/scrollLock';
 import { EQUIPMENT_LABELS_HE, MUSCLE_LABELS_HE, type EquipmentType, type Exercise, type SetEntry } from '../types';
 
 export function unknownExercise(id: string): Exercise {
@@ -214,24 +216,27 @@ function useVisibleViewport(): { top: number; height: number } | null {
   return box;
 }
 
+/**
+ * Bottom sheet. Rendered into <body> (outside the screen's scroll area, so a
+ * swipe cannot chain to the screen behind it) and locks that area while open;
+ * only `.modal__body` scrolls.
+ */
 export function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
   const visible = useVisibleViewport();
+  const backdropRef = useRef<HTMLDivElement>(null);
+  useScrollLock(backdropRef, '.modal__body');
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
     };
     window.addEventListener('keydown', onKey);
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      window.removeEventListener('keydown', onKey);
-      document.body.style.overflow = prevOverflow;
-    };
+    return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
 
-  return (
+  return createPortal(
     <div
+      ref={backdropRef}
       className="modal-backdrop"
       style={visible ? { top: visible.top, height: visible.height, bottom: 'auto' } : undefined}
       onClick={(e) => e.target === e.currentTarget && onClose()}
@@ -245,7 +250,8 @@ export function Modal({ title, onClose, children }: { title: string; onClose: ()
         </div>
         <div className="modal__body">{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

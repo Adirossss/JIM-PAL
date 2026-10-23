@@ -161,6 +161,12 @@ button {
   display: none;
 }
 
+/* A sheet is open: the screen behind it must not scroll. */
+.app--locked .screen-scroll {
+  overflow: hidden;
+  touch-action: none;
+}
+
 .content {
   max-width: 640px;
   min-height: 100%;
@@ -1697,7 +1703,12 @@ h2.exercise-title .exercise-title__he {
 
 .modal__body {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
+  /* The list scrolls; reaching its end never scrolls anything behind the sheet. */
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
   padding: 6px 16px calc(16px + env(safe-area-inset-bottom));
   display: flex;
   flex-direction: column;

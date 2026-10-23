@@ -8,6 +8,7 @@ import {
   type FormEvent,
   type ReactNode,
 } from 'react';
+import { useScrollLock } from './scrollLock';
 
 export interface ConfirmOptions {
   title: string;
@@ -108,11 +109,13 @@ function useEscape(onEscape: () => void) {
 
 function ConfirmSheet({ options, onClose }: { options: ConfirmOptions; onClose: (ok: boolean) => void }) {
   const confirmRef = useRef<HTMLButtonElement>(null);
+  const backdropRef = useRef<HTMLDivElement>(null);
+  useScrollLock(backdropRef);
   useEscape(() => onClose(false));
   useEffect(() => confirmRef.current?.focus(), []);
 
   return (
-    <div className="modal-backdrop" onClick={(e) => e.target === e.currentTarget && onClose(false)}>
+    <div ref={backdropRef} className="modal-backdrop" onClick={(e) => e.target === e.currentTarget && onClose(false)}>
       <div
         className="confirm-sheet"
         role="alertdialog"
@@ -148,6 +151,8 @@ function ConfirmSheet({ options, onClose }: { options: ConfirmOptions; onClose: 
 
 function PromptSheet({ options, onClose }: { options: PromptOptions; onClose: (value: string | null) => void }) {
   const [value, setValue] = useState(options.initial ?? '');
+  const backdropRef = useRef<HTMLDivElement>(null);
+  useScrollLock(backdropRef);
   useEscape(() => onClose(null));
 
   const submit = (e: FormEvent) => {
@@ -156,7 +161,7 @@ function PromptSheet({ options, onClose }: { options: PromptOptions; onClose: (v
   };
 
   return (
-    <div className="modal-backdrop" onClick={(e) => e.target === e.currentTarget && onClose(null)}>
+    <div ref={backdropRef} className="modal-backdrop" onClick={(e) => e.target === e.currentTarget && onClose(null)}>
       <form className="confirm-sheet" role="dialog" aria-modal="true" aria-labelledby="prompt-title" onSubmit={submit}>
         <span className="progress-sheet__grip" aria-hidden="true" />
         <h2 id="prompt-title">{options.title}</h2>
