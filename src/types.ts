@@ -89,6 +89,14 @@ export interface WorkoutTemplate {
   createdAt: string;
 }
 
+/** A template per weekday, plus when the calendar reminder fires (schema v4). */
+export interface WeeklySchedule {
+  /** Seven entries, Sunday first: a template id, or null for a rest day. */
+  days: Array<string | null>;
+  /** Reminder time of day, "HH:MM" (24h). */
+  reminderTime: string;
+}
+
 export interface AppData {
   schemaVersion: number;
   customExercises: Exercise[];
@@ -102,6 +110,8 @@ export interface AppData {
   templates: WorkoutTemplate[];
   /** Body weight and measurements, any order (schema v3). */
   bodyEntries: BodyEntry[];
+  /** Fixed weekly workouts (schema v4). */
+  schedule: WeeklySchedule;
 }
 
 export const MUSCLE_LABELS_HE: Record<MuscleGroup, string> = {

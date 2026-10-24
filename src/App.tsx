@@ -10,6 +10,7 @@ import { HistoryScreen } from './components/HistoryScreen';
 import { WorkoutDetail } from './components/WorkoutDetail';
 import { EditWorkout, WorkoutScreen } from './components/WorkoutScreen';
 import { BodyScreen } from './components/BodyScreen';
+import { ScheduleScreen } from './components/ScheduleScreen';
 
 export function App({ initial }: { initial: InitialState }) {
   return (
@@ -54,6 +55,8 @@ function Screen({ route }: { route: Route }) {
       return <EditWorkout workoutId={route.workoutId} />;
     case 'body':
       return <BodyScreen />;
+    case 'schedule':
+      return <ScheduleScreen />;
     case 'exercises':
       return <ExercisesScreen />;
     case 'exerciseDetail':

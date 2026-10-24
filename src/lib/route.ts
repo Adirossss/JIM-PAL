@@ -4,6 +4,7 @@ export type Route =
   | { name: 'workoutDetail'; workoutId: string }
   | { name: 'workoutEdit'; workoutId: string }
   | { name: 'body' }
+  | { name: 'schedule' }
   | { name: 'exercises' }
   | { name: 'exerciseDetail'; exerciseId: string }
   | { name: 'newExercise' }
@@ -26,6 +27,8 @@ export function parseRoute(hash: string): Route {
       return { name: 'data' };
     case 'body':
       return { name: 'body' };
+    case 'schedule':
+      return { name: 'schedule' };
     default:
       return { name: 'workout' };
   }
@@ -43,6 +46,8 @@ export function routeToHash(route: Route): string {
       return `#/history/${encodeURIComponent(route.workoutId)}/edit`;
     case 'body':
       return '#/body';
+    case 'schedule':
+      return '#/schedule';
     case 'exercises':
       return '#/exercises';
     case 'exerciseDetail':
@@ -58,6 +63,7 @@ export function tabOf(route: Route): Tab {
   switch (route.name) {
     case 'workout':
     case 'body':
+    case 'schedule':
       return 'workout';
     case 'history':
     case 'workoutDetail':

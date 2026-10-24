@@ -2078,3 +2078,32 @@ h2.exercise-title .exercise-title__he {
 .progress-hero .segmented {
   background: var(--hero-btn);
 }
+
+/* ── Weekly schedule ────────────────────────────────────── */
+
+.today-card {
+  gap: 8px;
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.schedule-days {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.schedule-day {
+  display: grid;
+  grid-template-columns: 6.5rem minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+}
+
+.schedule-day__name {
+  font-weight: 600;
+}
+
+.schedule-day--today .schedule-day__name {
+  color: var(--accent);
+}

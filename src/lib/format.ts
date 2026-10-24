@@ -36,7 +36,14 @@ export function relativeDayHe(value: string, today: string): string {
   return formatDateHe(value);
 }
 
-const HEBREW_WEEKDAYS =['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
+/** Weekday names, Sunday first (index = Date.getDay()). */
+export const HEBREW_WEEKDAYS = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
+
+/** Day of the week of a YYYY-MM-DD date, 0 = Sunday. */
+export function weekdayIndex(value: string): number {
+  const [y, m, d] = value.split('-').map(Number);
+  return new Date(Date.UTC(y ?? 1970, (m ?? 1) - 1, d ?? 1)).getUTCDay();
+}
 
 /** "2026-10-22" → "יום חמישי" */
 export function weekdayHe(value: string): string {

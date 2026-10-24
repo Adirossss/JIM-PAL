@@ -3,6 +3,7 @@ import type { AppData } from '../types';
 import {
   CURRENT_SCHEMA_VERSION,
   emptyAppData,
+  emptySchedule,
   exportFileName,
   migrateAppData,
   parseImport,
@@ -12,7 +13,8 @@ import {
 
 function sampleData(): AppData {
   return {
-    schemaVersion: 3,
+    schemaVersion: 4,
+    schedule: { days: [null, 't1', null, null, 't1', null, null], reminderTime: '07:30' },
     bodyEntries: [
       { id: 'b1', date: '2026-10-20', weight: 81.4, waist: 84, chest: null, arm: 36.5, note: '' },
     ],
@@ -71,7 +73,7 @@ describe('validateAppData', () => {
     ['empty exercise name', (d) => { d.customExercises[0]!.nameHe = '  '; }],
     ['duplicate workout id', (d) => { d.activeWorkout!.id = 'w1'; }],
     ['custom id clashing with seed', (d) => { d.customExercises[0]!.id = 'deadlift'; }],
-    ['wrong schema version', (d) => { d.schemaVersion = 2; }],
+    ['wrong schema version', (d) => { d.schemaVersion = 3; }],
     ['drop flag not boolean', (d) => { (d.workouts[0]!.exercises[0]!.sets[0] as unknown as Record<string, unknown>).drop = 'yes'; }],
     ['empty superset id', (d) => { d.workouts[0]!.exercises[0]!.supersetId = ' '; }],
     ['missing body entries', (d) => { delete (d as Partial<AppData>).bodyEntries; }],
@@ -87,6 +89,10 @@ describe('validateAppData', () => {
     ['template with a repeated exercise', (d) => { d.templates[0]!.exerciseIds = ['pull-up', 'pull-up']; }],
     ['template with bad timestamp', (d) => { d.templates[0]!.createdAt = 'soon'; }],
     ['duplicate template id', (d) => { d.templates.push({ ...d.templates[0]! }); }],
+    ['missing schedule', (d) => { delete (d as Partial<AppData>).schedule; }],
+    ['schedule with 6 days', (d) => { d.schedule.days.pop(); }],
+    ['schedule day not an id', (d) => { (d.schedule.days as unknown[])[0] = 3; }],
+    ['bad reminder time', (d) => { d.schedule.reminderTime = '25:00'; }],
   ];
 
   it.each(broken)('rejects %s', (_name, breakIt) => {
@@ -112,20 +118,33 @@ describe('migrateAppData', () => {
   });
 
   it('upgrades version 1 data to the current version without changing anything existing', () => {
-    const { favoriteExerciseIds: _f, templates: _t, bodyEntries: _b, ...rest } = sampleData();
+    const { favoriteExerciseIds: _f, templates: _t, bodyEntries: _b, schedule: _s, ...rest } = sampleData();
     const v1 = { ...rest, schemaVersion: 1 };
     const r = migrateAppData(v1);
     expect(r.ok).toBe(true);
     if (!r.ok) return;
-    expect(r.value).toEqual({ ...rest, schemaVersion: 3, favoriteExerciseIds: [], templates: [], bodyEntries: [] });
+    expect(r.value).toEqual({ ...rest, schemaVersion: 4, favoriteExerciseIds: [], templates: [], bodyEntries: [], schedule: emptySchedule() });
     // A v1 backup file still imports.
     expect(parseImport(JSON.stringify({ app: 'jim-pal', exportedAt: '2026-10-20T00:00:00.000Z', ...v1 })).ok).toBe(true);
   });
 
-  it('upgrades version 2 data (favorites and templates kept) to version 3', () => {
-    const { bodyEntries: _b, ...rest } = sampleData();
+  it('upgrades version 2 data (favorites and templates kept)', () => {
+    const { bodyEntries: _b, schedule: _s, ...rest } = sampleData();
     const r = migrateAppData({ ...rest, schemaVersion: 2 });
-    expect(r).toEqual({ ok: true, value: { ...rest, schemaVersion: 3, bodyEntries: [] } });
+    expect(r).toEqual({ ok: true, value: { ...rest, schemaVersion: 4, bodyEntries: [], schedule: emptySchedule() } });
+  });
+
+  it('upgrades version 3 data with an empty weekly schedule', () => {
+    const { schedule: _s, ...rest } = sampleData();
+    const r = migrateAppData({ ...rest, schemaVersion: 3 });
+    expect(r).toEqual({ ok: true, value: { ...rest, schemaVersion: 4, schedule: emptySchedule() } });
+  });
+
+  it('turns a schedule day whose template is gone into a rest day', () => {
+    const d = sampleData();
+    d.schedule.days[2] = 'deleted-template';
+    const r = validateAppData(d);
+    expect(r.ok && r.value.schedule.days).toEqual([null, 't1', null, null, 't1', null, null]);
   });
 
   it('keeps drop and superset fields only when set', () => {

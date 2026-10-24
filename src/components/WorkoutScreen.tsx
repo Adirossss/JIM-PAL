@@ -35,6 +35,7 @@ import {
 } from '../lib/workout';
 import { sortTemplates } from '../lib/templates';
 import { bodyChange, formatBodyChange } from '../lib/body';
+import { hasSchedule, nextScheduled, removeTemplateFromSchedule, scheduledTemplate } from '../lib/schedule';
 import { useApp } from '../state/AppContext';
 import { exportBackup, useBackupReminder } from '../state/backup';
 import { useConfirm } from '../state/confirm';
@@ -94,6 +95,14 @@ function Home() {
 
       <section className="sheet" aria-label="סיכום">
         <BackupReminder />
+        <TodayCard
+          onStart={(template) =>
+            update((prev) => ({
+              ...prev,
+              activeWorkout: startWorkoutWith(template.exerciseIds, new Date(), isValidDateString(date) ? date : today),
+            }))
+          }
+        />
         {last ? (
           <>
             {recentExerciseChips(recentlyUsedExerciseIds(data.workouts).slice(0, 8))}
@@ -120,6 +129,7 @@ function Home() {
             <p className="muted small">אחרי שתסיים את האימון הראשון, יופיעו כאן הנפח, השיאים וההתקדמות.</p>
           </EmptyState>
         )}
+        <ScheduleCard />
         <BodyCard />
       </section>
     </div>
@@ -289,6 +299,61 @@ function WeekCard() {
   );
 }
 
+/** Today's fixed workout, with one tap to start it. Hidden on rest days. */
+function TodayCard({ onStart }: { onStart: (template: WorkoutTemplate) => void }) {
+  const { data, navigate } = useApp();
+  const today = toLocalDateString(new Date());
+  const template = scheduledTemplate(data.schedule, data.templates, today);
+  if (!template) return null;
+
+  return (
+    <section className="card today-card" aria-label="האימון של היום">
+      <div className="row" style={{ flexWrap: 'nowrap', justifyContent: 'space-between' }}>
+        <span className="headline">
+          <span className="small muted">האימון של היום</span>
+          <span className="headline__date">{template.name}</span>
+          <span className="headline__stats">{template.exerciseIds.length} תרגילים</span>
+        </span>
+        <button type="button" className="btn btn--primary" onClick={() => onStart(template)}>
+          <Icon name="dumbbell" size={18} />
+          התחל
+        </button>
+      </div>
+      <button type="button" className="link-btn" style={{ alignSelf: 'flex-start' }} onClick={() => navigate({ name: 'schedule' })}>
+        עריכת האימונים הקבועים
+      </button>
+    </section>
+  );
+}
+
+/** Opens the weekly schedule; says what's next when today is a rest day. */
+function ScheduleCard() {
+  const { data, navigate } = useApp();
+  const today = toLocalDateString(new Date());
+  if (scheduledTemplate(data.schedule, data.templates, today)) return null; // TodayCard shows it
+
+  let text = 'קבע אימון לכל יום בשבוע וקבל תזכורת ביומן';
+  if (hasSchedule(data.schedule, data.templates)) {
+    const next = nextScheduled(data.schedule, data.templates, today);
+    text = next ? `היום מנוחה · הבא: ${weekdayHe(next.date)}, ${next.template.name}` : 'היום מנוחה';
+  }
+
+  return (
+    <button type="button" className="card card--link body-card" onClick={() => navigate({ name: 'schedule' })}>
+      <span className="suggest-set__icon" aria-hidden="true">
+        <Icon name="calendar" />
+      </span>
+      <span className="headline" style={{ flex: 1 }}>
+        <span className="headline__date">אימונים קבועים</span>
+        <span className="headline__stats">{text}</span>
+      </span>
+      <span className="go-circle" aria-hidden="true">
+        <Icon name="go" size={18} />
+      </span>
+    </button>
+  );
+}
+
 /** Latest body weight and the change since the previous weigh-in; opens the body screen. */
 function BodyCard() {
   const { data, navigate } = useApp();
@@ -382,11 +447,19 @@ function Templates({ onStart }: { onStart: (template: WorkoutTemplate) => void }
   const remove = async (t: WorkoutTemplate) => {
     const ok = await confirm({
       title: `למחוק את התבנית "${t.name}"?`,
-      message: 'האימונים שכבר עשית לא יימחקו.',
+      message: data.schedule.days.includes(t.id)
+        ? 'האימונים שכבר עשית לא יימחקו. הימים שהתבנית קבועה בהם יהפכו לימי מנוחה.'
+        : 'האימונים שכבר עשית לא יימחקו.',
       confirmLabel: 'מחק תבנית',
       danger: true,
     });
-    if (ok) update((d) => ({ ...d, templates: d.templates.filter((x) => x.id !== t.id) }));
+    if (ok) {
+      update((d) => ({
+        ...d,
+        templates: d.templates.filter((x) => x.id !== t.id),
+        schedule: removeTemplateFromSchedule(d.schedule, t.id),
+      }));
+    }
   };
 
   return (

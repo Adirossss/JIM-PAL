@@ -11,11 +11,13 @@ import {
   type WorkoutExercise,
   type WorkoutTemplate,
   type BodyEntry,
+  type WeeklySchedule,
 } from '../types';
 import { isValidDateString } from './format';
 import { MAX_REPS, MAX_WEIGHT_KG } from './workout';
 
-export const CURRENT_SCHEMA_VERSION = 3;
+export const CURRENT_SCHEMA_VERSION = 4;
+export const DEFAULT_REMINDER_TIME = '18:00';
 export const EXPORT_APP_ID = 'jim-pal';
 export const MAX_TEMPLATE_NAME = 60;
 /** Plausible ranges for body measurements. */
@@ -31,7 +33,17 @@ export function emptyAppData(): AppData {
     favoriteExerciseIds: [],
     templates: [],
     bodyEntries: [],
+    schedule: emptySchedule(),
   };
+}
+
+export function emptySchedule(): WeeklySchedule {
+  return { days: [null, null, null, null, null, null, null], reminderTime: DEFAULT_REMINDER_TIME };
+}
+
+/** "HH:MM", 00:00–23:59. */
+export function isValidTime(v: unknown): v is string {
+  return typeof v === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(v);
 }
 
 /** Upgrades raw data from version N to N + 1, keyed by N. */
@@ -41,6 +53,8 @@ export const MIGRATIONS: Readonly<Record<number, Migration>> = {
   1: (data) => ({ ...data, favoriteExerciseIds: [], templates: [] }),
   // v3 adds body entries (drop sets and supersets are optional fields on existing records).
   2: (data) => ({ ...data, bodyEntries: [] }),
+  // v4 adds the weekly schedule, empty (every day a rest day).
+  3: (data) => ({ ...data, schedule: emptySchedule() }),
 };
 
 export type Result<T> = { ok: true; value: T } | { ok: false; errors: string[] };
@@ -222,6 +236,18 @@ class Validator {
     return { id: this.string(o, 'id', path, { nonEmpty: true }), name, exerciseIds, createdAt: o.createdAt as string };
   }
 
+  schedule(v: unknown, path: string): WeeklySchedule {
+    const o = this.object(v, path);
+    if (!o) return emptySchedule();
+    const days = this.array(o, 'days', path);
+    if (days.length !== 7) this.fail(`${path}.days`, 'חייב 7 ימים');
+    days.forEach((d, i) => {
+      if (d !== null && (typeof d !== 'string' || d.trim() === '')) this.fail(`${path}.days[${i}]`, 'חייב להיות null או מזהה תבנית');
+    });
+    if (!isValidTime(o.reminderTime)) this.fail(`${path}.reminderTime`, 'שעה לא תקינה (HH:MM)');
+    return { days: days as Array<string | null>, reminderTime: o.reminderTime as string };
+  }
+
   unique(ids: string[], path: string, what: string): void {
     const seen = new Set<string>();
     for (const id of ids) {
@@ -255,6 +281,7 @@ export function validateAppData(value: unknown): Result<AppData> {
   const bodyEntries = v
     .array(o, 'bodyEntries', 'root')
     .map((b, i) => v.bodyEntry(b, `bodyEntries[${i}]`)) as BodyEntry[];
+  const schedule = v.schedule(o.schedule, 'schedule');
 
   if (v.errors.length === 0) {
     const seedIds = new Set(SEED_EXERCISES.map((e) => e.id));
@@ -279,6 +306,8 @@ export function validateAppData(value: unknown): Result<AppData> {
       favoriteExerciseIds,
       templates,
       bodyEntries,
+      // A day whose template was deleted (or not in this file) becomes a rest day.
+      schedule: { ...schedule, days: schedule.days.map((d) => (d !== null && templates.some((t) => t.id === d) ? d : null)) },
     },
   };
 }

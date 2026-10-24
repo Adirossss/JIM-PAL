@@ -29,6 +29,11 @@ browser's `localStorage`.
   `weight × (1 + reps / 30)`), and an SVG chart of the best estimated 1RM over time.
 - **This week** — workouts, sets and volume this week (Sunday to Saturday) with the
   change from last week, a weekly streak, and sets per muscle group.
+- **Fixed weekly workouts** — pick a template for each weekday; the home screen shows
+  today's workout with a one-tap start. "הוסף ליומן" adds the plan to the phone's
+  calendar as weekly repeating events (an `.ics` file) with an alert at a chosen time,
+  so the reminder arrives even when the app is closed — no server needed. The
+  calendar does not update itself: after changing the plan, add it again.
 - **Body weight & measurements** — log body weight and optional waist, chest and
   arm measurements, see each one charted over time with the change since the
   previous and the first measurement.
@@ -77,9 +82,10 @@ npm run preview    # serve the production build locally
 ## How data is stored
 
 - All data lives under a single `localStorage` key, `jim-pal:data`, as one JSON
-  document with a `schemaVersion` field (currently `3`). Version 2 added
+  document with a `schemaVersion` field (currently `4`). Version 2 added
   `favoriteExerciseIds` and `templates`; version 3 added `bodyEntries` and the
-  optional `drop` (set) and `supersetId` (exercise in a workout) fields. Older data
+  optional `drop` (set) and `supersetId` (exercise in a workout) fields; version 4
+  added the weekly `schedule`. Older data
   (stored or imported) is upgraded automatically by the migrations in
   `src/lib/schema.ts`.
 - `src/lib/storage.ts` is the only module that touches `localStorage`.
@@ -105,6 +111,7 @@ src/
     workout.ts         workout/set operations, supersets, pre-fill, recommendations, validation
     templates.ts       favorites and workout templates
     body.ts            body weight and measurements
+    schedule.ts        fixed weekly workouts and the calendar (.ics) file
     backup.ts          when to show the backup reminder
     theme.ts           light / dark / follow-the-phone
     schema.ts          schema version, migrations, import validation, export

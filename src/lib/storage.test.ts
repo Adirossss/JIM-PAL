@@ -38,17 +38,17 @@ describe('storage', () => {
     const store = memoryStore();
     expect(saveAppData(store, dataWithActiveWorkout())).toEqual({ ok: true });
     const raw = JSON.parse(store.getItem(STORAGE_KEY)!);
-    expect(raw.schemaVersion).toBe(3);
+    expect(raw.schemaVersion).toBe(4);
     expect(loadAppData(store, NOW)).toEqual({ status: 'loaded', data: dataWithActiveWorkout() });
   });
 
   it('upgrades version 1 data on load and saves it back as the current version', () => {
     const store = memoryStore();
-    const { favoriteExerciseIds: _f, templates: _t, bodyEntries: _b, ...v1 } = { ...dataWithActiveWorkout(), schemaVersion: 1 };
+    const { favoriteExerciseIds: _f, templates: _t, bodyEntries: _b, schedule: _s, ...v1 } = { ...dataWithActiveWorkout(), schemaVersion: 1 };
     store.setItem(STORAGE_KEY, JSON.stringify(v1));
     const r = loadAppData(store, NOW);
     expect(r).toEqual({ status: 'loaded', data: dataWithActiveWorkout() });
-    expect(JSON.parse(store.getItem(STORAGE_KEY)!).schemaVersion).toBe(3);
+    expect(JSON.parse(store.getItem(STORAGE_KEY)!).schemaVersion).toBe(4);
   });
 
   it('backs up unreadable JSON instead of discarding it', () => {
