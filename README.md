@@ -30,11 +30,10 @@ browser's `localStorage`.
 - **This week** — workouts, sets and volume this week (Sunday to Saturday) with the
   change from last week, a weekly streak, and sets per muscle group.
 - **Fixed weekly workouts** — pick a template for each weekday; the home screen shows
-  today's workout with a one-tap start. "הוסף ליומן" adds the plan to the phone's
-  calendar: each workout opens Google Calendar with a weekly repeating event at a
-  chosen time, ready to save,
-  so the reminder arrives even when the app is closed — no server needed. The
-  calendar does not update itself: after changing the plan, add it again.
+  today's workout with a one-tap start. Each scheduled workout has an "הוסף" link
+  that opens Google Calendar with a weekly repeating event at a chosen time, ready
+  to save, so Google Calendar reminds even when the app is closed — no server
+  needed. The calendar does not update itself: after changing the plan, add it again.
 - **Body weight & measurements** — log body weight and optional waist, chest and
   arm measurements, see each one charted over time with the change since the
   previous and the first measurement.
