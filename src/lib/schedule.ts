@@ -46,78 +46,64 @@ export function hasSchedule(schedule: WeeklySchedule, templates: readonly Workou
   return schedule.days.some((id) => id !== null && templates.some((t) => t.id === id));
 }
 
-const ICS_DAYS = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
 
-function escapeText(text: string): string {
-  return text.replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n');
+/** One repeating calendar event: a template on all of its weekdays. */
+export interface ScheduledEvent {
+  template: WorkoutTemplate;
+  /** Weekdays, 0 = Sunday, ascending. */
+  days: number[];
+  /** First date on or after `today` that falls on one of the days. */
+  firstDate: string;
 }
 
-/** Folds a content line at 75 octets (RFC 5545), never splitting a UTF-8 character. */
-function fold(line: string): string {
-  const encoder = new TextEncoder();
-  const parts: string[] = [];
-  let current = '';
-  let size = 0;
-  for (const ch of line) {
-    const bytes = encoder.encode(ch).length;
-    const limit = parts.length === 0 ? 75 : 74; // continuation lines start with a space
-    if (size + bytes > limit) {
-      parts.push(current);
-      current = '';
-      size = 0;
-    }
-    current += ch;
-    size += bytes;
-  }
-  parts.push(current);
-  return parts.join('\r\n ');
-}
-
-function icsUtc(date: Date): string {
-  return date.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
-}
-
-/**
- * A calendar file with one weekly repeating event per template (on all of its
- * days) at the reminder time, each with an alert when it starts. Times are
- * "floating" (no time zone), so the phone reads them as local time.
- */
-export function buildCalendar(
+/** Groups the schedule by template, in the order of the week. */
+export function scheduleEvents(
   schedule: WeeklySchedule,
   templates: readonly WorkoutTemplate[],
-  exerciseName: (id: string) => string,
   today: string,
-  now: Date,
-): string {
+): ScheduledEvent[] {
   const byTemplate = new Map<WorkoutTemplate, number[]>();
   schedule.days.forEach((id, day) => {
     const template = id ? templates.find((t) => t.id === id) : undefined;
     if (template) byTemplate.set(template, [...(byTemplate.get(template) ?? []), day]);
   });
+  return [...byTemplate].map(([template, days]) => {
+    let firstDate = today;
+    while (!days.includes(weekdayIndex(firstDate))) firstDate = addDays(firstDate, 1);
+    return { template, days, firstDate };
+  });
+}
 
-  const time = schedule.reminderTime.replace(':', '') + '00';
-  const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Jim-Pal//Workout schedule//HE', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH'];
-  for (const [template, days] of byTemplate) {
-    let first = today;
-    while (!days.includes(weekdayIndex(first))) first = addDays(first, 1);
-    const summary = `אימון: ${template.name}`;
-    lines.push(
-      'BEGIN:VEVENT',
-      `UID:jim-pal-${template.id}@jim-pal`,
-      `DTSTAMP:${icsUtc(now)}`,
-      `DTSTART:${first.replace(/-/g, '')}T${time}`,
-      'DURATION:PT1H',
-      `RRULE:FREQ=WEEKLY;BYDAY=${days.map((d) => ICS_DAYS[d]).join(',')}`,
-      `SUMMARY:${escapeText(summary)}`,
-      `DESCRIPTION:${escapeText(template.exerciseIds.map(exerciseName).join('\n'))}`,
-      'BEGIN:VALARM',
-      'ACTION:DISPLAY',
-      `DESCRIPTION:${escapeText(summary)}`,
-      'TRIGGER:PT0M',
-      'END:VALARM',
-      'END:VEVENT',
-    );
-  }
-  lines.push('END:VCALENDAR');
-  return lines.map(fold).join('\r\n') + '\r\n';
+const RRULE_DAYS = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
+
+/** "2026-10-27" + "07:30" (+ minutes) → "20261027T073000", rolling over midnight. */
+function calendarDateTime(date: string, time: string, addMinutes = 0): string {
+  const [h, m] = time.split(':').map(Number);
+  const total = (h ?? 0) * 60 + (m ?? 0) + addMinutes;
+  const day = addDays(date, Math.floor(total / 1440));
+  const minutes = total % 1440;
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${day.replace(/-/g, '')}T${pad(Math.floor(minutes / 60))}${pad(minutes % 60)}00`;
+}
+
+/**
+ * A link that opens Google Calendar with the event filled in: weekly on the
+ * template's days, one hour from the reminder time, in the phone's time zone.
+ * Google Calendar then notifies with the calendar's default reminder.
+ */
+export function googleCalendarUrl(
+  event: ScheduledEvent,
+  time: string,
+  exerciseName: (id: string) => string,
+  timeZone: string,
+): string {
+  const params = new URLSearchParams({
+    action: 'TEMPLATE',
+    text: `אימון: ${event.template.name}`,
+    dates: `${calendarDateTime(event.firstDate, time)}/${calendarDateTime(event.firstDate, time, 60)}`,
+    details: event.template.exerciseIds.map(exerciseName).join('\n'),
+    recur: `RRULE:FREQ=WEEKLY;BYDAY=${event.days.map((d) => RRULE_DAYS[d]).join(',')}`,
+    ctz: timeZone,
+  });
+  return `https://calendar.google.com/calendar/render?${params}`;
 }

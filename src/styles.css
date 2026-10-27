@@ -2154,3 +2154,13 @@ h2.exercise-title .exercise-title__he {
 .technique-details[open] > summary {
   margin-bottom: 4px;
 }
+
+.calendar-row {
+  cursor: default;
+  padding-inline: 0;
+}
+
+.calendar-row .btn {
+  text-decoration: none;
+  flex-shrink: 0;
+}

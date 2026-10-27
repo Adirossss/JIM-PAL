@@ -2,10 +2,11 @@ import { describe, expect, it } from 'vitest';
 import type { WorkoutTemplate } from '../types';
 import { emptySchedule } from './schema';
 import {
-  buildCalendar,
   hasSchedule,
+  googleCalendarUrl,
   nextScheduled,
   removeTemplateFromSchedule,
+  scheduleEvents,
   scheduledTemplate,
   setReminderTime,
   setScheduleDay,
@@ -47,38 +48,34 @@ describe('weekly schedule', () => {
   });
 });
 
-describe('buildCalendar', () => {
+describe('Google Calendar links', () => {
   const names: Record<string, string> = { 'leg-press': 'לחיצת רגליים', 'barbell-squat': 'סקוואט', 'barbell-bench-press': 'לחיצת חזה' };
-  const ics = buildCalendar(setReminderTime(plan, '07:30'), templates, (id) => names[id] ?? id, '2026-10-26', new Date('2026-10-26T10:00:00.000Z'));
-  const unfolded = ics.replace(/\r\n /g, '');
+  // From Monday 26.10: legs (Sun/Thu) first falls on Thursday 29.10, chest on Tuesday 27.10.
+  const events = scheduleEvents(plan, templates, '2026-10-26');
 
-  it('is a CRLF calendar with one weekly event per template', () => {
-    expect(ics.startsWith('BEGIN:VCALENDAR\r\nVERSION:2.0\r\n')).toBe(true);
-    expect(ics.endsWith('END:VCALENDAR\r\n')).toBe(true);
-    expect(ics.split('\r\n').every((l) => !l.includes('\n'))).toBe(true);
-    expect(unfolded.match(/BEGIN:VEVENT/g)).toHaveLength(2);
-    expect(unfolded).toContain('RRULE:FREQ=WEEKLY;BYDAY=SU,TH');
-    expect(unfolded).toContain('RRULE:FREQ=WEEKLY;BYDAY=TU');
+  it('groups the week into one weekly event per template', () => {
+    expect(events.map((e) => [e.template.id, e.days, e.firstDate])).toEqual([
+      ['t-legs', [0, 4], '2026-10-29'],
+      ['t-chest', [2], '2026-10-27'],
+    ]);
+    expect(scheduleEvents(emptySchedule(), templates, '2026-10-26')).toEqual([]);
   });
 
-  it('starts each event on its next day at the reminder time, with an alert', () => {
-    // From Monday 26.10: legs (Sun/Thu) first falls on Thursday 29.10, chest on Tuesday 27.10.
-    expect(unfolded).toContain('UID:jim-pal-t-legs@jim-pal\r\nDTSTAMP:20261026T100000Z\r\nDTSTART:20261029T073000');
-    expect(unfolded).toContain('DTSTART:20261027T073000');
-    expect(unfolded.match(/TRIGGER:PT0M/g)).toHaveLength(2);
+  it('fills in the title, time, repeat days, exercises and time zone', () => {
+    const url = new URL(googleCalendarUrl(events[0]!, '07:30', (id) => names[id] ?? id, 'Asia/Jerusalem'));
+    expect(url.origin + url.pathname).toBe('https://calendar.google.com/calendar/render');
+    expect(Object.fromEntries(url.searchParams)).toEqual({
+      action: 'TEMPLATE',
+      text: 'אימון: רגליים',
+      dates: '20261029T073000/20261029T083000',
+      details: 'לחיצת רגליים\nסקוואט',
+      recur: 'RRULE:FREQ=WEEKLY;BYDAY=SU,TH',
+      ctz: 'Asia/Jerusalem',
+    });
   });
 
-  it('escapes text and lists the exercises', () => {
-    expect(unfolded).toContain('SUMMARY:אימון: חזה\\, גב');
-    expect(unfolded).toContain('DESCRIPTION:לחיצת רגליים\\nסקוואט');
-  });
-
-  it('folds long lines at 75 bytes without splitting Hebrew letters', () => {
-    const long = { ...legs, name: 'א'.repeat(80) };
-    const everyDay = { ...emptySchedule(), days: Array<string | null>(7).fill(long.id) };
-    const out = buildCalendar(everyDay, [long], (id) => id, '2026-10-26', new Date());
-    const encoder = new TextEncoder();
-    for (const line of out.split('\r\n')) expect(encoder.encode(line).length).toBeLessThanOrEqual(75);
-    expect(out.replace(/\r\n /g, '')).toContain(`SUMMARY:אימון: ${'א'.repeat(80)}`);
+  it('rolls a late workout over midnight', () => {
+    const url = new URL(googleCalendarUrl(events[1]!, '23:30', (id) => id, 'Asia/Jerusalem'));
+    expect(url.searchParams.get('dates')).toBe('20261027T233000/20261028T003000');
   });
 });

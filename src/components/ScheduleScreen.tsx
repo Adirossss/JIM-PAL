@@ -1,41 +1,19 @@
-import { useState } from 'react';
 import { HEBREW_WEEKDAYS, toLocalDateString, weekdayIndex } from '../lib/format';
-import { buildCalendar, hasSchedule, setReminderTime, setScheduleDay } from '../lib/schedule';
+import { googleCalendarUrl, scheduleEvents, setReminderTime, setScheduleDay } from '../lib/schedule';
 import { sortTemplates } from '../lib/templates';
 import { useApp } from '../state/AppContext';
-import { openInCalendar, shareCalendarFile } from '../state/calendar';
 import { BackButton, EmptyState, Icon, ScreenHeader } from './common';
 
-/** Fixed weekly workouts: a template per weekday, and adding them to the phone's calendar. */
+/** Fixed weekly workouts: a template per weekday, and adding them to Google Calendar. */
 export function ScheduleScreen() {
   const { data, update, goBack, exerciseById } = useApp();
   const { schedule } = data;
   const templates = sortTemplates(data.templates);
   const today = toLocalDateString(new Date());
   const todayIndex = weekdayIndex(today);
-  const planned = hasSchedule(schedule, data.templates);
-  const [status, setStatus] = useState<string | null>(null);
-
-  const calendar = () =>
-    buildCalendar(schedule, data.templates, (id) => exerciseById.get(id)?.nameHe ?? 'תרגיל', today, new Date());
-
-  const addToCalendar = () => {
-    if (!openInCalendar(calendar())) {
-      void saveFile();
-      return;
-    }
-    setStatus('אם נפתח חלון של היומן, לחץ "הוסף הכל". מעכשיו היומן יזכיר לך בכל יום אימון.');
-  };
-
-  const saveFile = async () => {
-    const result = await shareCalendarFile(calendar());
-    if (result === 'cancelled') return;
-    setStatus(
-      result === 'shared'
-        ? 'שמור את הקובץ ב"קבצים", ואז פתח אותו שם ולחץ "הוסף הכל".'
-        : 'הקובץ ירד. פתח אותו כדי להוסיף את האימונים ליומן.',
-    );
-  };
+  const events = scheduleEvents(schedule, data.templates, today);
+  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const exerciseName = (id: string) => exerciseById.get(id)?.nameHe ?? 'תרגיל';
 
   return (
     <div className="stack">
@@ -79,7 +57,7 @@ export function ScheduleScreen() {
           </section>
 
           <section className="card" aria-label="תזכורת ביומן">
-            <h2>תזכורת ביומן</h2>
+            <h2>תזכורת ב-Google Calendar</h2>
             <label className="field">
               <span className="field__label">שעת האימון והתזכורת</span>
               <input
@@ -91,23 +69,41 @@ export function ScheduleScreen() {
               />
             </label>
             <p className="small muted">
-              האימונים נכנסים ליומן של הטלפון כאירוע שחוזר כל שבוע, והיומן שולח התראה בשעה הזאת גם כשהאפליקציה סגורה.
+              לחץ "הוסף" ליד כל אימון: נפתח Google Calendar עם אירוע שחוזר כל שבוע, ונשאר רק ללחוץ "שמירה". Google
+              Calendar ישלח התראה גם כשהאפליקציה סגורה.
             </p>
-            <button type="button" className="btn btn--primary btn--large btn--block" onClick={addToCalendar} disabled={!planned}>
-              <Icon name="calendar" size={18} />
-              הוסף ליומן
-            </button>
-            <button type="button" className="link-btn" onClick={saveFile} disabled={!planned}>
-              לא נפתח? שמור כקובץ יומן
-            </button>
-            {!planned && <p className="small muted">בחר אימון לפחות ליום אחד.</p>}
-            {status && (
-              <div className="notice notice--success" role="status">
-                {status}
+            {events.length === 0 ? (
+              <p className="small muted">בחר אימון לפחות ליום אחד.</p>
+            ) : (
+              <div>
+                {events.map((event) => (
+                  <div key={event.template.id} className="session-row calendar-row">
+                    <span className="headline">
+                      <span className="headline__date">{event.template.name}</span>
+                      <span className="headline__stats">
+                        כל {event.days.map((d) => HEBREW_WEEKDAYS[d]).join(' ו')} · {schedule.reminderTime}
+                      </span>
+                    </span>
+                    <a
+                      className="btn btn--primary btn--small"
+                      href={googleCalendarUrl(event, schedule.reminderTime, exerciseName, timeZone)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label={`הוסף את ${event.template.name} ל-Google Calendar`}
+                    >
+                      <Icon name="calendar" size={16} />
+                      הוסף
+                    </a>
+                  </div>
+                ))}
               </div>
             )}
             <p className="small muted">
-              שינית את הלוח או את השעה? הוסף שוב ליומן ומחק ביומן את האירועים הקודמים, כי היומן לא מתעדכן לבד.
+              ההתראה נקבעת לפי ברירת המחדל של Google Calendar (בדרך כלל 30 דקות לפני). אפשר לשנות אותה באירוע לפני
+              השמירה.
+            </p>
+            <p className="small muted">
+              שינית את הלוח או את השעה? הוסף שוב ומחק ב-Google Calendar את האירועים הקודמים, כי היומן לא מתעדכן לבד.
             </p>
           </section>
         </>

@@ -31,7 +31,8 @@ browser's `localStorage`.
   change from last week, a weekly streak, and sets per muscle group.
 - **Fixed weekly workouts** — pick a template for each weekday; the home screen shows
   today's workout with a one-tap start. "הוסף ליומן" adds the plan to the phone's
-  calendar as weekly repeating events (an `.ics` file) with an alert at a chosen time,
+  calendar: each workout opens Google Calendar with a weekly repeating event at a
+  chosen time, ready to save,
   so the reminder arrives even when the app is closed — no server needed. The
   calendar does not update itself: after changing the plan, add it again.
 - **Body weight & measurements** — log body weight and optional waist, chest and
@@ -111,7 +112,7 @@ src/
     workout.ts         workout/set operations, supersets, pre-fill, recommendations, validation
     templates.ts       favorites and workout templates
     body.ts            body weight and measurements
-    schedule.ts        fixed weekly workouts and the calendar (.ics) file
+    schedule.ts        fixed weekly workouts and Google Calendar links
     backup.ts          when to show the backup reminder
     theme.ts           light / dark / follow-the-phone
     schema.ts          schema version, migrations, import validation, export
