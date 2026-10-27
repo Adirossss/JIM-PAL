@@ -119,6 +119,9 @@ export function ExerciseEntryCard({
           >
             <Icon name="chart" />
           </button>
+          <button type="button" className="icon-btn icon-btn--panel icon-btn--danger" onClick={remove} aria-label="הסר תרגיל">
+            <Icon name="trash" />
+          </button>
         </div>
       </div>
       {showTechnique && (
@@ -304,9 +307,6 @@ export function ExerciseEntryCard({
           aria-label="הזז את התרגיל אחר כך"
         >
           <Icon name="down" size={18} />
-        </button>
-        <button type="button" className="icon-btn icon-btn--panel icon-btn--danger" onClick={remove} aria-label="הסר תרגיל">
-          <Icon name="trash" size={18} />
         </button>
       </div>
 
