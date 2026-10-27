@@ -23,7 +23,8 @@ import {
 import { useApp } from '../state/AppContext';
 import { useConfirm } from '../state/confirm';
 import type { EquipmentType, SetEntry, Workout, WorkoutExercise } from '../types';
-import { ExerciseTags, ExerciseTitle, Icon, formatSet, useExercise } from './common';
+import { ExerciseTags, ExerciseTitle, Icon, Modal, formatSet, useExercise } from './common';
+import { TechniquePanel } from './Technique';
 
 const WEIGHT_STEP_KG = 2.5;
 
@@ -77,6 +78,7 @@ export function ExerciseEntryCard({
   const formId = useId();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showNote, setShowNote] = useState(entry.note !== '');
+  const [showTechnique, setShowTechnique] = useState(false);
 
   const previous = exerciseSessions(history, entry.exerciseId)[0];
   const canDuplicate = entry.sets.length > 0 || lastLoggedSet(entry.exerciseId, null, history) !== null;
@@ -105,15 +107,25 @@ export function ExerciseEntryCard({
           <ExerciseTitle exercise={exercise} as="h2" />
           <ExerciseTags exercise={exercise} />
         </div>
-        <button
-          type="button"
-          className="icon-btn icon-btn--panel"
-          aria-label="התקדמות בתרגיל"
-          onClick={() => navigate({ name: 'exerciseDetail', exerciseId: entry.exerciseId })}
-        >
-          <Icon name="chart" />
-        </button>
+        <div className="row" style={{ flexWrap: 'nowrap', gap: 6, alignSelf: 'flex-start' }}>
+          <button type="button" className="icon-btn icon-btn--panel" aria-label="איך מבצעים" onClick={() => setShowTechnique(true)}>
+            <Icon name="info" />
+          </button>
+          <button
+            type="button"
+            className="icon-btn icon-btn--panel"
+            aria-label="התקדמות בתרגיל"
+            onClick={() => navigate({ name: 'exerciseDetail', exerciseId: entry.exerciseId })}
+          >
+            <Icon name="chart" />
+          </button>
+        </div>
       </div>
+      {showTechnique && (
+        <Modal title={exercise.nameHe} onClose={() => setShowTechnique(false)}>
+          <TechniquePanel exercise={exercise} />
+        </Modal>
+      )}
 
       {inSuperset && (
         <div className="superset-banner">

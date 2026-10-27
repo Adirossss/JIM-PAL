@@ -103,6 +103,7 @@ function Home() {
             }))
           }
         />
+        <ScheduleCard />
         {last ? (
           <>
             {recentExerciseChips(recentlyUsedExerciseIds(data.workouts).slice(0, 8))}
@@ -129,7 +130,6 @@ function Home() {
             <p className="muted small">אחרי שתסיים את האימון הראשון, יופיעו כאן הנפח, השיאים וההתקדמות.</p>
           </EmptyState>
         )}
-        <ScheduleCard />
         <BodyCard />
       </section>
     </div>

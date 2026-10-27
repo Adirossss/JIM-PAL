@@ -18,15 +18,17 @@ function download(ics: string): void {
 /**
  * On a phone, opens the events the way Safari opens a calendar link, which
  * shows the system "add to calendar" sheet. On a computer, downloads the
- * .ics file (opening it adds the events to the calendar app).
+ * .ics file (opening it adds the events to the calendar app). Returns false
+ * when no window could be opened.
  */
-export function openInCalendar(ics: string): void {
+export function openInCalendar(ics: string): boolean {
   if (!isTouch()) {
     download(ics);
-    return;
+    return true;
   }
+  // Never navigate the app itself away: if no window opens, the screen offers the file instead.
   const url = `data:text/calendar;charset=utf-8,${encodeURIComponent(ics)}`;
-  if (!window.open(url, '_blank')) window.location.href = url;
+  return window.open(url, '_blank') !== null;
 }
 
 /** Fallback: hands the .ics file to the share sheet (save to Files, then open it), or downloads it. */

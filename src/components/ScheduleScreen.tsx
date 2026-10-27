@@ -20,7 +20,10 @@ export function ScheduleScreen() {
     buildCalendar(schedule, data.templates, (id) => exerciseById.get(id)?.nameHe ?? 'תרגיל', today, new Date());
 
   const addToCalendar = () => {
-    openInCalendar(calendar());
+    if (!openInCalendar(calendar())) {
+      void saveFile();
+      return;
+    }
     setStatus('אם נפתח חלון של היומן, לחץ "הוסף הכל". מעכשיו היומן יזכיר לך בכל יום אימון.');
   };
 

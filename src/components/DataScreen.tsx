@@ -5,7 +5,7 @@ import { useConfirm } from '../state/confirm';
 import { useThemePreference } from '../state/theme';
 import { exportBackup, useBackupReminder } from '../state/backup';
 import { THEME_LABELS_HE, THEME_PREFERENCES } from '../lib/theme';
-import { ScreenHeader } from './common';
+import { Icon, ScreenHeader } from './common';
 import { Stat } from './WorkoutDetail';
 
 const MAX_IMPORT_BYTES = 20 * 1024 * 1024;
@@ -38,7 +38,7 @@ function ThemeCard() {
 }
 
 export function DataScreen() {
-  const { data, update } = useApp();
+  const { data, update, navigate } = useApp();
   const confirm = useConfirm();
   const fileInput = useRef<HTMLInputElement>(null);
   const [status, setStatus] = useState<Status>(null);
@@ -97,6 +97,18 @@ export function DataScreen() {
     <div className="stack">
       <ScreenHeader title="גיבוי והגדרות" />
       <ThemeCard />
+      <button type="button" className="card card--link body-card" onClick={() => navigate({ name: 'schedule' })}>
+        <span className="suggest-set__icon" aria-hidden="true">
+          <Icon name="calendar" />
+        </span>
+        <span className="headline" style={{ flex: 1 }}>
+          <span className="headline__date">אימונים קבועים</span>
+          <span className="headline__stats">איזה אימון בכל יום, ותזכורת ביומן</span>
+        </span>
+        <span className="go-circle" aria-hidden="true">
+          <Icon name="go" size={18} />
+        </span>
+      </button>
       <section className="card">
         <h2>הנתונים שלך</h2>
         <div className="stat-grid">

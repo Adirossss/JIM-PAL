@@ -2107,3 +2107,50 @@ h2.exercise-title .exercise-title__he {
 .schedule-day--today .schedule-day__name {
   color: var(--accent);
 }
+
+/* ── Exercise technique ─────────────────────────────────── */
+
+.technique {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.technique__title {
+  margin: 4px 0 0;
+  font-size: 1rem;
+}
+
+.technique__list {
+  margin: 0;
+  padding-inline-start: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  line-height: 1.45;
+}
+
+.technique__list--mistakes li::marker {
+  color: var(--danger);
+}
+
+.technique .btn {
+  text-decoration: none;
+}
+
+.technique-details > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  list-style: none;
+}
+
+.technique-details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.technique-details[open] > summary {
+  margin-bottom: 4px;
+}

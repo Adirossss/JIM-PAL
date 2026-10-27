@@ -17,6 +17,7 @@ import {
   useExercise,
 } from './common';
 import { ProgressChart } from './ProgressChart';
+import { TechniquePanel } from './Technique';
 
 export function ExerciseDetail({ exerciseId }: { exerciseId: string }) {
   const { data, update, goBack, navigate } = useApp();
@@ -80,6 +81,14 @@ export function ExerciseDetail({ exerciseId }: { exerciseId: string }) {
           )}
           {!known && <p className="small muted">התרגיל לא נמצא בספרייה (ייתכן שהגיע מקובץ מיובא).</p>}
         </div>
+
+        <details className="panel technique-details">
+          <summary>
+            <Icon name="info" size={18} />
+            איך מבצעים את התרגיל
+          </summary>
+          <TechniquePanel exercise={exercise} />
+        </details>
 
         {stats.sessions.length === 0 ? (
           <EmptyState title="עוד אין אימונים עם התרגיל הזה">
