@@ -50,6 +50,7 @@ const ICON_PATHS = {
   bookmark: 'M7 4h10v16l-5-3.5L7 20z',
   info: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 11v5M12 8h.01',
   play: 'M8 5.5v13l11-6.5z',
+  swap: 'M4 8h14M14 4l4 4-4 4M20 16H6M10 12l-4 4 4 4',
   scale:'M7 4h10a3 3 0 0 1 3 3v10a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3zM8.5 10a3.5 3.5 0 0 1 7 0M12 10l1.5-2',
 } as const;
 

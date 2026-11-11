@@ -14,6 +14,7 @@ import {
   stepReps,
   stepWeight,
   suggestNextSet,
+  swapExercise,
   supersetGroup,
   unlinkFromSuperset,
   updateSet,
@@ -22,8 +23,9 @@ import {
 } from '../lib/workout';
 import { useApp } from '../state/AppContext';
 import { useConfirm } from '../state/confirm';
-import type { EquipmentType, SetEntry, Workout, WorkoutExercise } from '../types';
+import type { EquipmentType, Exercise, SetEntry, Workout, WorkoutExercise } from '../types';
 import { ExerciseTags, ExerciseTitle, Icon, Modal, formatSet, useExercise } from './common';
+import { SwapExerciseModal } from './SwapExerciseModal';
 import { TechniquePanel } from './Technique';
 
 const WEIGHT_STEP_KG = 2.5;
@@ -79,6 +81,23 @@ export function ExerciseEntryCard({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showNote, setShowNote] = useState(entry.note !== '');
   const [showTechnique, setShowTechnique] = useState(false);
+  const [showSwap, setShowSwap] = useState(false);
+
+  const swapTo = async (next: Exercise) => {
+    if (
+      entry.sets.length > 0 &&
+      !(await confirm({
+        title: `להחליף ל"${next.nameHe}"?`,
+        message: `${entry.sets.length} הסטים שכבר רשמת יעברו לתרגיל החדש.`,
+        confirmLabel: 'החלף',
+      }))
+    ) {
+      return;
+    }
+    setShowSwap(false);
+    setEditingId(null);
+    onChange((w) => swapExercise(w, entry.id, next.id));
+  };
 
   const previous = exerciseSessions(history, entry.exerciseId)[0];
   const canDuplicate = entry.sets.length > 0 || lastLoggedSet(entry.exerciseId, null, history) !== null;
@@ -108,6 +127,9 @@ export function ExerciseEntryCard({
           <ExerciseTags exercise={exercise} />
         </div>
         <div className="row" style={{ flexWrap: 'nowrap', gap: 6, alignSelf: 'flex-start' }}>
+          <button type="button" className="icon-btn icon-btn--panel" aria-label="החלף תרגיל" onClick={() => setShowSwap(true)}>
+            <Icon name="swap" />
+          </button>
           <button type="button" className="icon-btn icon-btn--panel" aria-label="איך מבצעים" onClick={() => setShowTechnique(true)}>
             <Icon name="info" />
           </button>
@@ -128,6 +150,14 @@ export function ExerciseEntryCard({
         <Modal title={exercise.nameHe} onClose={() => setShowTechnique(false)}>
           <TechniquePanel exercise={exercise} />
         </Modal>
+      )}
+      {showSwap && (
+        <SwapExerciseModal
+          current={exercise}
+          inWorkoutIds={new Set(workout.exercises.map((e) => e.exerciseId))}
+          onPick={swapTo}
+          onClose={() => setShowSwap(false)}
+        />
       )}
 
       {inSuperset && (

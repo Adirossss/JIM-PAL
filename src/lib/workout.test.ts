@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Workout } from '../types';
+import { SEED_EXERCISES } from '../data/exercises';
 import {
   addExercise,
   addSet,
@@ -15,6 +16,8 @@ import {
   setWorkoutNote,
   startWorkout,
   startWorkoutFrom,
+  swapAlternatives,
+  swapExercise,
   suggestNextExercises,
   suggestNextSet,
   linkWithNext,
@@ -360,5 +363,32 @@ describe('finishWorkout', () => {
   it('refuses to finish a workout with no sets', () => {
     const w = addExercise(startWorkout(NOW, undefined, ids()), 'bench', ids());
     expect(finishWorkout(w, NOW).ok).toBe(false);
+  });
+});
+
+describe('swapExercise', () => {
+  it('replaces the exercise but keeps sets, note and superset', () => {
+    const w: Workout = {
+      id: 'w', date: '2026-11-11', startedAt: '', finishedAt: null, note: '',
+      exercises: [
+        { id: 'a', exerciseId: 'rope-triceps-pushdown', note: 'n', supersetId: 's', sets: [{ id: 's1', weight: 20, reps: 10 }] },
+        { id: 'b', exerciseId: 'barbell-curl', note: '', supersetId: 's', sets: [] },
+      ],
+    };
+    const out = swapExercise(w, 'a', 'cable-triceps-pushdown');
+    expect(out.exercises[0]).toEqual({ ...w.exercises[0], exerciseId: 'cable-triceps-pushdown' });
+    expect(out.exercises[1]).toBe(w.exercises[1]);
+  });
+});
+
+describe('swapAlternatives', () => {
+  it('lists the same muscle, same equipment first, without the current exercise', () => {
+    const rope = SEED_EXERCISES.find((e) => e.id === 'rope-triceps-pushdown')!;
+    const alts = swapAlternatives(rope, SEED_EXERCISES);
+    expect(alts.every((e) => e.primaryMuscle === 'triceps' && e.id !== rope.id)).toBe(true);
+    expect(alts.map((e) => e.id)).toContain('cable-triceps-pushdown');
+    const firstOther = alts.findIndex((e) => e.equipment !== 'cable');
+    expect(alts.slice(0, firstOther).every((e) => e.equipment === 'cable')).toBe(true);
+    expect(alts.slice(firstOther).every((e) => e.equipment !== 'cable')).toBe(true);
   });
 });

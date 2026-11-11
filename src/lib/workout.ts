@@ -1,4 +1,4 @@
-import type { EquipmentType, SetEntry, Workout, WorkoutExercise } from '../types';
+import type { EquipmentType, Exercise, SetEntry, Workout, WorkoutExercise } from '../types';
 import { parseReps, parseWeight, toLocalDateString } from './format';
 import { createId, type IdFactory } from './ids';
 import { sortWorkoutsNewestFirst } from './stats';
@@ -101,6 +101,33 @@ export function addExercise(workout: Workout, exerciseId: string, newId: IdFacto
 
 export function removeExercise(workout: Workout, entryId: string): Workout {
   return normalizeSupersets({ ...workout, exercises: workout.exercises.filter((e) => e.id !== entryId) });
+}
+
+/**
+ * Replaces the exercise of an entry with another one, keeping its place,
+ * note, superset and any sets already logged.
+ */
+export function swapExercise(workout: Workout, entryId: string, exerciseId: string): Workout {
+  return {
+    ...workout,
+    exercises: workout.exercises.map((e) => (e.id === entryId ? { ...e, exerciseId } : e)),
+  };
+}
+
+/**
+ * Exercises that can stand in for `current`: same primary muscle, best match first
+ * (same equipment, then more shared secondary muscles, then name).
+ */
+export function swapAlternatives(current: Exercise, all: readonly Exercise[]): Exercise[] {
+  const shared = (e: Exercise) => e.secondaryMuscles.filter((m) => current.secondaryMuscles.includes(m)).length;
+  return all
+    .filter((e) => e.id !== current.id && e.primaryMuscle === current.primaryMuscle)
+    .sort(
+      (a, b) =>
+        Number(b.equipment === current.equipment) - Number(a.equipment === current.equipment) ||
+        shared(b) - shared(a) ||
+        a.nameHe.localeCompare(b.nameHe, 'he'),
+    );
 }
 
 /** Moves an exercise entry one position up (-1) or down (+1). */
